@@ -27,6 +27,15 @@ import { ShoppingListCard } from './shopping-list-card';
 // The model's machine-readable list is hidden while it streams; the server strips it on save.
 const LIST_TAG = '<shopping_list>';
 const STOP_RELOAD_DELAY_MS = 800;
+const SIDEBAR_KEY = 'recipe-box.sidebar-collapsed';
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 @Component({
   selector: 'app-root',
@@ -51,6 +60,7 @@ export class App implements OnInit {
   readonly error = signal('');
   readonly health = signal<Health | null>(null);
   readonly viewedImage = signal<Attachment | null>(null);
+  readonly sidebarCollapsed = signal(readCollapsed());
   prompt = '';
   private abortController: AbortController | null = null;
 
@@ -372,6 +382,16 @@ export class App implements OnInit {
       await this.refreshConversations();
     } catch (error) {
       this.showError(error, 'Could not delete this conversation.');
+    }
+  }
+
+  toggleSidebar() {
+    const collapsed = !this.sidebarCollapsed();
+    this.sidebarCollapsed.set(collapsed);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+    } catch {
+      // Private mode or blocked storage: the toggle still works for this visit.
     }
   }
 

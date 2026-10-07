@@ -1,4 +1,4 @@
-<div class="app-shell">
+<div class="app-shell" [class.collapsed]="sidebarCollapsed()">
   @if (viewedImage(); as image) {
     <div class="lightbox" role="dialog" aria-modal="true" [attr.aria-label]="image.originalName" (click)="closeImage()">
       <button type="button" class="lightbox-close" aria-label="Close image" (click)="closeImage()">×</button>
@@ -17,14 +17,38 @@
   <aside class="sidebar" [class.sidebar-open]="sidebarOpen()">
     <div class="brand">
       <div class="brand-mark">R</div>
-      <div>
+      <div class="brand-copy">
         <strong>Recipe Box</strong>
         <span>Cook · shop · eat</span>
       </div>
+      <button
+        class="collapse-button"
+        type="button"
+        (click)="toggleSidebar()"
+        [attr.aria-label]="sidebarCollapsed() ? 'Open sidebar' : 'Close sidebar'"
+        [attr.aria-expanded]="!sidebarCollapsed()"
+        [attr.data-tip]="sidebarCollapsed() ? 'Open sidebar' : null"
+        [attr.title]="sidebarCollapsed() ? null : 'Close sidebar'"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="1.8" />
+        </svg>
+      </button>
     </div>
 
-    <button class="new-chat" type="button" (click)="newConversation()">
-      <span>＋</span> New conversation
+    <button
+      class="new-chat"
+      type="button"
+      (click)="newConversation()"
+      aria-label="New conversation"
+      [attr.data-tip]="sidebarCollapsed() ? 'New conversation' : null"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path d="M12 20h8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" />
+      </svg>
+      <em>New conversation</em>
     </button>
 
     <div class="history-label">Recent conversations</div>
@@ -54,7 +78,7 @@
       }
     </nav>
 
-    <div class="local-badge"><span></span> {{ modelLabel() }}</div>
+    <div class="local-badge" [class.offline]="health()?.llm !== 'ok'" [attr.data-tip]="sidebarCollapsed() ? modelLabel() : null"><span></span><em>{{ modelLabel() }}</em></div>
   </aside>
 
   <main class="chat-panel">
