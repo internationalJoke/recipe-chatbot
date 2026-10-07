@@ -69,7 +69,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       data: { conversationId: id, role: "ASSISTANT", content: "", status: "PENDING", model: llm.model },
     });
 
-    return new Response(replyStream(id, pendingReply.id, userMessage), {
+    return new Response(replyStream(id, pendingReply.id, userMessage, request.signal), {
       status: 201,
       headers: {
         "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -93,10 +93,29 @@ async function discardTurn(userMessage: SavedUserMessage, replyId: string) {
   await Promise.allSettled(userMessage.attachments.map((a) => removeUpload(a.storagePath)));
 }
 
-function replyStream(conversationId: string, replyId: string, userMessage: SavedUserMessage) {
+// The user pressed Stop: keep what was written so far, or drop the empty reply.
+// A half-written shopping list is not offered for purchase.
+async function saveStoppedReply(replyId: string, partial: string) {
+  const { text } = extractShoppingList(partial);
+  if (!text) {
+    await prisma.message.delete({ where: { id: replyId } });
+    return;
+  }
+  await prisma.message.update({ where: { id: replyId }, data: { content: text, status: "COMPLETE" } });
+}
+
+function replyStream(
+  conversationId: string,
+  replyId: string,
+  userMessage: SavedUserMessage,
+  requestSignal: AbortSignal,
+) {
   const encoder = new TextEncoder();
   const operationAbort = new AbortController();
   let streamOpen = true;
+  let partial = "";
+  // Either signal means the browser went away (Stop button, closed tab).
+  requestSignal.addEventListener("abort", () => operationAbort.abort(), { once: true });
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
@@ -122,7 +141,10 @@ function replyStream(conversationId: string, replyId: string, userMessage: Saved
           send({ type: "status", status: "answering" });
           const reply = await streamChat(
             history.reverse(),
-            (chunk) => send({ type: "chunk", content: chunk }),
+            (chunk) => {
+              partial += chunk;
+              send({ type: "chunk", content: chunk });
+            },
             operationAbort.signal,
           );
 
@@ -141,6 +163,12 @@ function replyStream(conversationId: string, replyId: string, userMessage: Saved
           await prisma.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
           send({ type: "done", userMessage, assistantMessage });
         } catch (error) {
+          if (operationAbort.signal.aborted) {
+            await saveStoppedReply(replyId, partial).catch((saveError) =>
+              console.error("Could not save stopped reply:", saveError),
+            );
+            return;
+          }
           if (error instanceof TextOnlyModelError) {
             console.warn("Model is text only; discarding image message:", { conversationId, messageId: userMessage.id });
             await discardTurn(userMessage, replyId).catch((cleanupError) =>

@@ -7,6 +7,8 @@ export interface Attachment {
   originalName: string;
   mimeType: string;
   fileSize: number;
+  /** Local blob URL shown while the message is still uploading. */
+  previewUrl?: string;
 }
 
 export interface ShoppingItem {

@@ -111,7 +111,7 @@ describe("streamChat", () => {
     });
     const error = await streamChat([row("USER", "hi")], () => {}).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TextOnlyModelError);
-    expect((error as TextOnlyModelError).code).toBe("text_only");
+    expect((error as { code?: string }).code).toBe("text_only");
   });
 });
 

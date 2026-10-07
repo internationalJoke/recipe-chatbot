@@ -1,4 +1,11 @@
 <div class="app-shell">
+  @if (viewedImage(); as image) {
+    <div class="lightbox" role="dialog" aria-modal="true" [attr.aria-label]="image.originalName" (click)="closeImage()">
+      <button type="button" class="lightbox-close" aria-label="Close image" (click)="closeImage()">×</button>
+      <img [src]="attachmentUrl(image)" [alt]="image.originalName" (click)="$event.stopPropagation()" />
+    </div>
+  }
+
   <button class="mobile-menu" type="button" aria-label="Open conversation history" (click)="sidebarOpen.set(true)">
     ☰
   </button>
@@ -99,11 +106,11 @@
               <div class="attachments">
                 @for (attachment of message.attachments; track attachment.id) {
                   @if (isImage(attachment.mimeType)) {
-                    <a [href]="attachmentUrl(attachment.id)" target="_blank" rel="noopener">
-                      <img [src]="attachmentUrl(attachment.id)" [alt]="attachment.originalName" />
-                    </a>
+                    <button type="button" class="image-thumb" (click)="openImage(attachment)" [attr.aria-label]="'View ' + attachment.originalName">
+                      <img [src]="attachmentUrl(attachment)" [alt]="attachment.originalName" />
+                    </button>
                   } @else {
-                    <a class="file-card" [href]="attachmentUrl(attachment.id)" target="_blank" rel="noopener">
+                    <a class="file-card" [href]="attachmentUrl(attachment)" target="_blank" rel="noopener">
                       <span>TXT</span>{{ attachment.originalName }}
                     </a>
                   }
@@ -165,7 +172,11 @@
           aria-label="Message the recipe assistant"
           placeholder="Ask for a recipe, or attach a photo…"
         ></textarea>
-        <button class="send-button" type="button" aria-label="Send message" (click)="sendMessage()" [disabled]="loading() || (!prompt.trim() && !selectedFiles().length)">↑</button>
+        @if (loading()) {
+          <button class="send-button stop-button" type="button" aria-label="Stop answer" title="Stop" (click)="stop()">■</button>
+        } @else {
+          <button class="send-button" type="button" aria-label="Send message" (click)="sendMessage()" [disabled]="!prompt.trim() && !selectedFiles().length">↑</button>
+        }
       </div>
       <p class="composer-help">Enter to send · Paste an image · Shift + Enter for a new line · Up to 4 attachments</p>
     </footer>

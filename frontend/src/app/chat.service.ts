@@ -45,14 +45,17 @@ export class ChatService {
     content: string,
     files: File[],
     onChunk: (chunk: string) => void,
+    signal?: AbortSignal,
   ): Promise<SendMessageResponse> {
     const formData = new FormData();
     formData.append('content', content);
     files.forEach((file) => formData.append('files', file));
 
+    // Aborting closes the connection; the backend then stops the model call.
     const response = await fetch(`${this.baseUrl}/conversations/${id}/messages`, {
       method: 'POST',
       body: formData,
+      signal,
     });
 
     if (!response.ok) {

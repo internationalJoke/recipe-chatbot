@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   Component,
   ElementRef,
+  HostListener,
   OnInit,
   ViewChild,
   inject,
@@ -12,11 +13,19 @@ import {
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ChatService, ChatStreamError } from './chat.service';
-import { Conversation, ConversationSummary, Health, Message, ShoppingList } from './models';
+import {
+  Attachment,
+  Conversation,
+  ConversationSummary,
+  Health,
+  Message,
+  ShoppingList,
+} from './models';
 import { ShoppingListCard } from './shopping-list-card';
 
 // The model's machine-readable list is hidden while it streams; the server strips it on save.
 const LIST_TAG = '<shopping_list>';
+const STOP_RELOAD_DELAY_MS = 800;
 
 @Component({
   selector: 'app-root',
@@ -40,7 +49,9 @@ export class App implements OnInit {
   readonly sidebarOpen = signal(false);
   readonly error = signal('');
   readonly health = signal<Health | null>(null);
+  readonly viewedImage = signal<Attachment | null>(null);
   prompt = '';
+  private abortController: AbortController | null = null;
 
   async ngOnInit() {
     void this.chat.health().then((health) => this.health.set(health));
@@ -165,11 +176,23 @@ export class App implements OnInit {
     if (this.loading() || (!content && files.length === 0)) return;
 
     let resendTextOnly = false;
+    const abortController = new AbortController();
+    this.abortController = abortController;
     this.loading.set(true);
     this.error.set('');
     this.thinkingStatus.set(
-      files.some((file) => file.type.startsWith('image/')) ? 'Looking at your photo…' : 'Thinking…',
+      files.some((file) => this.isImage(file.type)) ? 'I’m working on it…' : 'Thinking…',
     );
+    // Show the user's files right away; the server copy replaces them after the reply.
+    const previews = files.map((file, index) => ({
+      id: `pending-file-${index}`,
+      originalName: file.name,
+      mimeType: file.type,
+      fileSize: file.size,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    const releasePreviews = () =>
+      previews.forEach((preview) => URL.revokeObjectURL(preview.previewUrl));
 
     try {
       let conversationId = this.activeConversation()?.id;
@@ -186,9 +209,9 @@ export class App implements OnInit {
         id: `pending-user-${requestId}`,
         conversationId,
         role: 'USER',
-        content: content || `Attached: ${files.map((file) => file.name).join(', ')}`,
+        content,
         status: 'COMPLETE',
-        attachments: [],
+        attachments: previews,
         createdAt: new Date().toISOString(),
       };
       this.activeConversation.update((conversation) =>
@@ -199,55 +222,100 @@ export class App implements OnInit {
       this.scrollToBottom();
 
       const streamingMessageId = `pending-assistant-${requestId}`;
-      await this.chat.sendMessage(conversationId, content, files, (chunk) => {
-        this.streaming.set(true);
-        this.activeConversation.update((conversation) => {
-          if (!conversation || conversation.id !== conversationId) return conversation;
+      await this.chat.sendMessage(
+        conversationId,
+        content,
+        files,
+        (chunk) => {
+          this.streaming.set(true);
+          this.activeConversation.update((conversation) => {
+            if (!conversation || conversation.id !== conversationId) return conversation;
 
-          const existingMessage = conversation.messages.find(
-            (message) => message.id === streamingMessageId,
-          );
-          if (!existingMessage) {
-            const streamingMessage: Message = {
-              id: streamingMessageId,
-              conversationId,
-              role: 'ASSISTANT',
-              content: chunk,
-              status: 'PENDING',
-              attachments: [],
-              createdAt: new Date().toISOString(),
+            const existingMessage = conversation.messages.find(
+              (message) => message.id === streamingMessageId,
+            );
+            if (!existingMessage) {
+              const streamingMessage: Message = {
+                id: streamingMessageId,
+                conversationId,
+                role: 'ASSISTANT',
+                content: chunk,
+                status: 'PENDING',
+                attachments: [],
+                createdAt: new Date().toISOString(),
+              };
+              return { ...conversation, messages: [...conversation.messages, streamingMessage] };
+            }
+
+            return {
+              ...conversation,
+              messages: conversation.messages.map((message) =>
+                message.id === streamingMessageId
+                  ? { ...message, content: message.content + chunk }
+                  : message,
+              ),
             };
-            return { ...conversation, messages: [...conversation.messages, streamingMessage] };
-          }
-
-          return {
-            ...conversation,
-            messages: conversation.messages.map((message) =>
-              message.id === streamingMessageId
-                ? { ...message, content: message.content + chunk }
-                : message,
-            ),
-          };
-        });
-        this.scrollToBottom();
-      });
+          });
+          this.scrollToBottom();
+        },
+        abortController.signal,
+      );
       this.activeConversation.set(await firstValueFrom(this.chat.getConversation(conversationId)));
+      releasePreviews();
       await this.refreshConversations();
       this.scrollToBottom();
     } catch (error) {
+      if (abortController.signal.aborted) {
+        this.finishStoppedAnswer();
+        return;
+      }
       if (error instanceof ChatStreamError && error.code === 'text_only') {
         resendTextOnly = await this.dropImagesAfterTextOnlyError(content, files);
+        releasePreviews();
         return;
       }
       this.prompt = content;
       this.selectedFiles.set(files);
       this.showError(error, 'The assistant could not answer. Check the backend and your API key.');
     } finally {
+      if (this.abortController === abortController) this.abortController = null;
       this.loading.set(false);
       this.streaming.set(false);
       this.thinkingStatus.set('Thinking…');
       if (resendTextOnly) void this.resendWithNotice();
     }
+  }
+
+  stop() {
+    this.abortController?.abort();
+  }
+
+  // Keep the partial answer on screen. The backend saves it after it notices the
+  // closed connection, so reload a moment later to pick up the stored version.
+  private finishStoppedAnswer() {
+    this.activeConversation.update((conversation) =>
+      conversation
+        ? {
+            ...conversation,
+            messages: conversation.messages.map((message) =>
+              message.status === 'PENDING' ? { ...message, status: 'COMPLETE' } : message,
+            ),
+          }
+        : conversation,
+    );
+    const conversationId = this.activeConversation()?.id;
+    if (!conversationId) return;
+    setTimeout(async () => {
+      if (this.loading() || this.activeConversation()?.id !== conversationId) return;
+      try {
+        this.activeConversation.set(
+          await firstValueFrom(this.chat.getConversation(conversationId)),
+        );
+        await this.refreshConversations();
+      } catch {
+        // The local view is already fine; the next send reloads anyway.
+      }
+    }, STOP_RELOAD_DELAY_MS);
   }
 
   // Resend the text, then show the notice unless the resend hit a different error.
@@ -305,8 +373,21 @@ export class App implements OnInit {
     }
   }
 
-  attachmentUrl(id: string) {
-    return this.chat.attachmentUrl(id);
+  openImage(attachment: Attachment) {
+    this.viewedImage.set(attachment);
+  }
+
+  closeImage() {
+    this.viewedImage.set(null);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    this.closeImage();
+  }
+
+  attachmentUrl(attachment: Attachment) {
+    return attachment.previewUrl ?? this.chat.attachmentUrl(attachment.id);
   }
 
   isImage(mimeType: string) {
