@@ -1,0 +1,8 @@
+node_modules
+.next
+.env
+uploads
+npm-debug.log
+coverage
+vitest.config.ts
+src/**/*.test.ts

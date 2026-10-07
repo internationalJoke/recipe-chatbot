@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum MessageStatus {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+enum ShoppingListStatus {
+  PROPOSED
+  ACCEPTED
+  DECLINED
+}
+
+model Conversation {
+  id        String    @id @default(uuid()) @db.Uuid
+  title     String    @default("New conversation") @db.VarChar(120)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([updatedAt])
+}
+
+model Message {
+  id             String        @id @default(uuid()) @db.Uuid
+  conversationId String        @db.Uuid
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  content        String        @db.Text
+  status         MessageStatus @default(COMPLETE)
+  model          String?       @db.VarChar(120)
+  attachments    Attachment[]
+  shoppingList   ShoppingList?
+  createdAt      DateTime      @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model Attachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  messageId    String   @db.Uuid
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  originalName String   @db.VarChar(255)
+  mimeType     String   @db.VarChar(120)
+  fileSize     Int
+  storagePath  String   @unique @db.VarChar(500)
+  createdAt    DateTime @default(now())
+
+  @@index([messageId])
+}
+
+// Ingredients the assistant proposes. Nothing is bought until the user accepts.
+model ShoppingList {
+  id        String             @id @default(uuid()) @db.Uuid
+  messageId String             @unique @db.Uuid
+  message   Message            @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  status    ShoppingListStatus @default(PROPOSED)
+  items     Json
+  order     Order?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model Order {
+  id             String       @id @default(uuid()) @db.Uuid
+  shoppingListId String       @unique @db.Uuid
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  store          String       @db.VarChar(120)
+  lines          Json
+  missing        Json
+  totalCents     Int
+  currency       String       @db.VarChar(3)
+  createdAt      DateTime     @default(now())
+}

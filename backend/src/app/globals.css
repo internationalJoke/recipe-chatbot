@@ -1,0 +1,4 @@
+* { box-sizing: border-box; }
+body { margin: 0; padding: 3rem; color: #eef7ef; background: #13231d; font: 16px/1.5 system-ui, sans-serif; }
+main { max-width: 720px; margin: 10vh auto; padding: 2rem; border: 1px solid #355247; border-radius: 18px; background: #1b3028; }
+a { color: #9bd19f; }

@@ -1,0 +1,69 @@
+<section class="card" [class.done]="list().status !== 'PROPOSED'" aria-label="Shopping list">
+  <header>
+    <span class="icon" aria-hidden="true">🛒</span>
+    <div>
+      <strong>Shopping list</strong>
+      <small>
+        @switch (list().status) {
+          @case ('PROPOSED') { Untick what you already have, then accept to buy. }
+          @case ('ACCEPTED') { Accepted — order placed. }
+          @case ('DECLINED') { Declined — nothing was bought. }
+        }
+      </small>
+    </div>
+  </header>
+
+  @if (list().status === 'ACCEPTED' && list().order; as order) {
+    <div class="receipt">
+      <div class="receipt-store">{{ order.store }}</div>
+      <ul>
+        @for (line of order.lines; track line.itemId) {
+          <li>
+            <span>{{ line.packs }} × {{ line.product }} <em>({{ line.packSize }})</em></span>
+            <span>{{ money(line.lineTotalCents, order.currency) }}</span>
+          </li>
+        }
+      </ul>
+      @if (order.missing.length) {
+        <p class="missing">Not in stock: {{ order.missing.join(', ') }}</p>
+      }
+      <div class="total">
+        <span>Total</span>
+        <strong>{{ money(order.totalCents, order.currency) }}</strong>
+      </div>
+    </div>
+  } @else {
+    <ul class="items">
+      @for (item of list().items; track item.id) {
+        <li>
+          <label [class.off]="!isSelected(item.id)">
+            <input
+              type="checkbox"
+              [checked]="isSelected(item.id)"
+              [disabled]="list().status !== 'PROPOSED' || busy()"
+              (change)="toggle(item.id)"
+            />
+            <span class="name">{{ item.name }}</span>
+            <span class="qty">{{ item.quantity }} {{ item.unit }}</span>
+          </label>
+          @if (item.note) {
+            <small class="note">{{ item.note }}</small>
+          }
+        </li>
+      }
+    </ul>
+  }
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  @if (list().status === 'PROPOSED') {
+    <div class="actions">
+      <button type="button" class="decline" (click)="decline()" [disabled]="busy()">Decline</button>
+      <button type="button" class="accept" (click)="accept()" [disabled]="busy() || selectedCount() === 0">
+        {{ busy() ? 'Buying…' : 'Accept & buy ' + selectedCount() + ' item' + (selectedCount() === 1 ? '' : 's') }}
+      </button>
+    </div>
+  }
+</section>

@@ -1,0 +1,173 @@
+<div class="app-shell">
+  <button class="mobile-menu" type="button" aria-label="Open conversation history" (click)="sidebarOpen.set(true)">
+    ☰
+  </button>
+
+  @if (sidebarOpen()) {
+    <button class="sidebar-scrim" type="button" aria-label="Close conversation history" (click)="sidebarOpen.set(false)"></button>
+  }
+
+  <aside class="sidebar" [class.sidebar-open]="sidebarOpen()">
+    <div class="brand">
+      <div class="brand-mark">R</div>
+      <div>
+        <strong>Recipe Box</strong>
+        <span>Cook · shop · eat</span>
+      </div>
+    </div>
+
+    <button class="new-chat" type="button" (click)="newConversation()">
+      <span>＋</span> New conversation
+    </button>
+
+    <div class="history-label">Recent conversations</div>
+    <nav class="history" aria-label="Conversation history">
+      @for (conversation of conversations(); track conversation.id) {
+        <button
+          class="history-item"
+          type="button"
+          [class.active]="activeConversation()?.id === conversation.id"
+          (click)="selectConversation(conversation.id)"
+        >
+          <span class="history-copy">
+            <strong>{{ conversation.title }}</strong>
+            <small>{{ formatDate(conversation.updatedAt) }}</small>
+          </span>
+          <span
+            class="delete-button"
+            role="button"
+            tabindex="0"
+            aria-label="Delete conversation"
+            (click)="deleteConversation($event, conversation.id)"
+            (keydown.enter)="deleteConversation($event, conversation.id)"
+          >×</span>
+        </button>
+      } @empty {
+        <p class="empty-history">Your conversations will appear here.</p>
+      }
+    </nav>
+
+    <div class="local-badge"><span></span> {{ modelLabel() }}</div>
+  </aside>
+
+  <main class="chat-panel">
+    <header class="chat-header">
+      <div>
+        <p>Conversation</p>
+        <h1>{{ activeConversation()?.title || 'New conversation' }}</h1>
+      </div>
+      <div class="model-pill" [class.offline]="health()?.llm !== 'ok'" [title]="health()?.error || ''"><span></span> {{ modelLabel() }}</div>
+    </header>
+
+    <section #messageList class="messages" aria-live="polite">
+      @if (!activeConversation()?.messages?.length) {
+        <div class="welcome">
+          <div class="welcome-icon">🍳</div>
+          <p class="eyebrow">Recipes · photos · grocery shopping</p>
+          <h2>What should we cook today?</h2>
+          <p>Send a photo of your fridge, a dish, or a recipe — or just type. When you need ingredients, I list them here. Nothing is bought until you click Accept.</p>
+          <div class="suggestions">
+            <button type="button" (click)="prompt = 'What can I cook with what is in this photo of my fridge?'">Cook from my fridge</button>
+            <button type="button" (click)="prompt = 'Give me a quick chicken curry recipe for 4 people.'">Chicken curry for 4</button>
+            <button type="button" (click)="prompt = 'I want to make lasagna tonight. I already have pasta, salt, and olive oil.'">Lasagna tonight</button>
+          </div>
+        </div>
+      }
+
+      @for (message of activeConversation()?.messages ?? []; track message.id) {
+        <article class="message" [class.user-message]="message.role === 'USER'" [class.failed-message]="message.status === 'FAILED'">
+          <div class="avatar">{{ message.role === 'USER' ? 'You' : 'R' }}</div>
+          <div class="message-body">
+            <div class="message-meta">
+              <strong>{{ message.role === 'USER' ? 'You' : 'Chef' }}</strong>
+              <span>{{ formatDate(message.createdAt) }}</span>
+            </div>
+
+            @if (message.content) {
+              <p class="message-text">
+                @for (part of messageParts(message.content); track $index) {
+                  @if (part.url) {
+                    <a [href]="part.url" target="_blank" rel="noopener noreferrer">{{ part.text }}</a>
+                  } @else {
+                    {{ part.text }}
+                  }
+                }
+              </p>
+            }
+
+            @if (message.attachments.length) {
+              <div class="attachments">
+                @for (attachment of message.attachments; track attachment.id) {
+                  @if (isImage(attachment.mimeType)) {
+                    <a [href]="attachmentUrl(attachment.id)" target="_blank" rel="noopener">
+                      <img [src]="attachmentUrl(attachment.id)" [alt]="attachment.originalName" />
+                    </a>
+                  } @else {
+                    <a class="file-card" [href]="attachmentUrl(attachment.id)" target="_blank" rel="noopener">
+                      <span>TXT</span>{{ attachment.originalName }}
+                    </a>
+                  }
+                }
+              </div>
+            }
+
+            @if (message.shoppingList; as list) {
+              <app-shopping-list-card [list]="list" (changed)="onListChanged(message.id, $event)" />
+            }
+          </div>
+        </article>
+      }
+
+      @if (loading() && !streaming()) {
+        <article class="message thinking">
+          <div class="avatar">R</div>
+          <div class="message-body">
+            <div class="message-meta"><strong>Chef</strong></div>
+            <div class="thinking-status" role="status">
+              <span>{{ thinkingStatus() }}</span>
+              <span class="typing" aria-hidden="true"><span></span><span></span><span></span></span>
+            </div>
+          </div>
+        </article>
+      }
+    </section>
+
+    <footer class="composer-area">
+      @if (error()) {
+        <div class="error-banner" role="alert">{{ error() }}</div>
+      }
+
+      @if (selectedFiles().length) {
+        <div class="selected-files">
+          @for (file of selectedFiles(); track file.name; let index = $index) {
+            <span>{{ file.name }} <button type="button" aria-label="Remove file" (click)="removeFile(index)">×</button></span>
+          }
+        </div>
+      }
+
+      <div class="composer">
+        <input
+          #fileInput
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,text/plain,text/markdown,application/json"
+          multiple
+          hidden
+          (change)="onFilesSelected($event)"
+        />
+        <button class="attach-button" type="button" aria-label="Attach image or text file" (click)="fileInput.click()" [disabled]="loading()">📎</button>
+        <textarea
+          [(ngModel)]="prompt"
+          (keydown)="onComposerKeydown($event)"
+          (paste)="onPaste($event)"
+          [disabled]="loading()"
+          maxlength="8000"
+          rows="1"
+          aria-label="Message the recipe assistant"
+          placeholder="Ask for a recipe, or attach a photo…"
+        ></textarea>
+        <button class="send-button" type="button" aria-label="Send message" (click)="sendMessage()" [disabled]="loading() || (!prompt.trim() && !selectedFiles().length)">↑</button>
+      </div>
+      <p class="composer-help">Enter to send · Paste an image · Shift + Enter for a new line · Up to 4 attachments</p>
+    </footer>
+  </main>
+</div>

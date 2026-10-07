@@ -1,0 +1,9 @@
+.DS_Store
+.env
+backend/.env
+backend/uploads/
+backend/node_modules/
+backend/.next/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
