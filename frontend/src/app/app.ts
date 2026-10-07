@@ -22,6 +22,7 @@ import {
   ShoppingList,
 } from './models';
 import { FridgeCartoon } from './fridge-cartoon';
+import { ProduceLogo } from './produce-logo';
 import { ShoppingListCard } from './shopping-list-card';
 
 // The model's machine-readable list is hidden while it streams; the server strips it on save.
@@ -39,7 +40,7 @@ function readCollapsed() {
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon],
+  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon, ProduceLogo],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.css',

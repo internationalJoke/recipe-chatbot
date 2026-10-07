@@ -16,7 +16,7 @@
 
   <aside class="sidebar" [class.sidebar-open]="sidebarOpen()">
     <div class="brand">
-      <div class="brand-mark">R</div>
+      <div class="brand-mark"><app-produce-logo /></div>
       <div class="brand-copy">
         <strong>Recipe Box</strong>
         <span>Cook · shop · eat</span>
@@ -107,7 +107,9 @@
 
       @for (message of activeConversation()?.messages ?? []; track message.id) {
         <article class="message" [class.user-message]="message.role === 'USER'" [class.failed-message]="message.status === 'FAILED'">
-          <div class="avatar">{{ message.role === 'USER' ? 'You' : 'R' }}</div>
+          <div class="avatar" [class.chef-avatar]="message.role !== 'USER'">
+            @if (message.role === 'USER') { You } @else { <app-produce-logo /> }
+          </div>
           <div class="message-body">
             <div class="message-meta">
               <strong>{{ message.role === 'USER' ? 'You' : 'Chef' }}</strong>
@@ -151,7 +153,7 @@
 
       @if (loading() && !streaming()) {
         <article class="message thinking">
-          <div class="avatar">R</div>
+          <div class="avatar chef-avatar"><app-produce-logo /></div>
           <div class="message-body">
             <div class="message-meta"><strong>Chef</strong></div>
             <div class="thinking-status" role="status">

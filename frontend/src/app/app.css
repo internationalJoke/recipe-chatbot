@@ -37,7 +37,7 @@ button { color: inherit; }
 .brand-copy { min-width: 0; flex: 1; }
 .collapse-button { flex: 0 0 auto; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 10px; color: var(--ink-soft); background: transparent; cursor: pointer; transition: .15s ease; }
 .collapse-button:hover { color: var(--leaf-dark); background: rgba(255, 255, 255, .75); }
-.brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 14px; color: #fff; background: linear-gradient(135deg, var(--tomato), var(--orange)); box-shadow: 0 6px 16px rgba(239, 75, 63, .3); font: 800 19px/1 Georgia, serif; }
+.brand-mark { flex: 0 0 46px; width: 46px; height: 46px; overflow: hidden; border-radius: 14px; box-shadow: 0 6px 16px rgba(46, 110, 70, .22), inset 0 0 0 1px rgba(46, 110, 70, .12); }
 .brand strong { display: block; font-family: Georgia, serif; font-size: 21px; letter-spacing: .01em; }
 .brand span { display: block; margin-top: 2px; color: var(--leaf); font-size: 12px; font-weight: 600; }
 .new-chat { width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 12px 16px; border: 0; border-radius: 12px; color: #fff; background: var(--leaf); box-shadow: 0 6px 16px rgba(46, 158, 85, .28); font-weight: 600; cursor: pointer; transition: .18s ease; }
@@ -101,6 +101,7 @@ button { color: inherit; }
 .message.user-message { flex-direction: row-reverse; }
 .avatar { flex: 0 0 34px; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; color: #fff; background: linear-gradient(135deg, var(--orange), var(--tomato)); font: 700 11px/1 Georgia, serif; }
 .user-message .avatar { color: #6b5300; background: var(--lemon); }
+.chef-avatar { overflow: hidden; background: none; box-shadow: 0 3px 10px rgba(46, 110, 70, .2), inset 0 0 0 1px rgba(46, 110, 70, .12); }
 .message-body { min-width: 0; max-width: min(680px,82%); }
 .user-message .message-body { display: flex; flex-direction: column; align-items: flex-end; }
 .message-meta { display: flex; align-items: center; gap: 9px; margin: 1px 2px 7px; }
