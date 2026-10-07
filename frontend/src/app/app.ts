@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { ChatService } from './chat.service';
+import { ChatService, ChatStreamError } from './chat.service';
 import { Conversation, ConversationSummary, Health, Message, ShoppingList } from './models';
 import { ShoppingListCard } from './shopping-list-card';
 
@@ -164,6 +164,7 @@ export class App implements OnInit {
     const files = this.selectedFiles();
     if (this.loading() || (!content && files.length === 0)) return;
 
+    let resendTextOnly = false;
     this.loading.set(true);
     this.error.set('');
     this.thinkingStatus.set(
@@ -234,6 +235,10 @@ export class App implements OnInit {
       await this.refreshConversations();
       this.scrollToBottom();
     } catch (error) {
+      if (error instanceof ChatStreamError && error.code === 'text_only') {
+        resendTextOnly = await this.dropImagesAfterTextOnlyError(content, files);
+        return;
+      }
       this.prompt = content;
       this.selectedFiles.set(files);
       this.showError(error, 'The assistant could not answer. Check the backend and your API key.');
@@ -241,7 +246,42 @@ export class App implements OnInit {
       this.loading.set(false);
       this.streaming.set(false);
       this.thinkingStatus.set('Thinking…');
+      if (resendTextOnly) void this.resendWithNotice();
     }
+  }
+
+  // Resend the text, then show the notice unless the resend hit a different error.
+  private async resendWithNotice() {
+    const notice = this.error();
+    await this.sendMessage();
+    if (!this.error()) this.error.set(notice);
+  }
+
+  // The backend already deleted the image message. Remove the photos here too and,
+  // if any text or text files are left, send them again automatically.
+  private async dropImagesAfterTextOnlyError(content: string, files: File[]) {
+    const textFiles = files.filter((file) => !this.isImage(file.type));
+    this.prompt = content;
+    this.selectedFiles.set(textFiles);
+
+    const conversationId = this.activeConversation()?.id;
+    if (conversationId) {
+      try {
+        this.activeConversation.set(
+          await firstValueFrom(this.chat.getConversation(conversationId)),
+        );
+      } catch {
+        // Keep the current view; the resend below reloads it anyway.
+      }
+    }
+
+    const canResend = Boolean(content) || textFiles.length > 0;
+    this.error.set(
+      canResend
+        ? 'This model supports text only. The image was removed and your text was sent.'
+        : 'This model supports text only. The image was removed — please type a message.',
+    );
+    return canResend;
   }
 
   onComposerKeydown(event: KeyboardEvent) {

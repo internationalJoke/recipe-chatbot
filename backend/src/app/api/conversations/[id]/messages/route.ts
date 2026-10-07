@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { streamChat } from "@/lib/llm";
+import { streamChat, TextOnlyModelError } from "@/lib/llm";
 import { describeLlm } from "@/lib/llm-config";
 import { MAX_FILES, removeUpload, saveUpload, validateUpload } from "@/lib/files";
 import { extractShoppingList } from "@/lib/shopping-list";
@@ -84,7 +84,16 @@ export async function POST(request: Request, { params }: RouteContext) {
   }
 }
 
-function replyStream(conversationId: string, replyId: string, userMessage: unknown) {
+type SavedUserMessage = { id: string; attachments: { storagePath: string }[] };
+
+// The model can't read images: drop this turn entirely so the page can resend text only
+// and the photo doesn't linger in the conversation history.
+async function discardTurn(userMessage: SavedUserMessage, replyId: string) {
+  await prisma.message.deleteMany({ where: { id: { in: [userMessage.id, replyId] } } });
+  await Promise.allSettled(userMessage.attachments.map((a) => removeUpload(a.storagePath)));
+}
+
+function replyStream(conversationId: string, replyId: string, userMessage: SavedUserMessage) {
   const encoder = new TextEncoder();
   const operationAbort = new AbortController();
   let streamOpen = true;
@@ -132,6 +141,14 @@ function replyStream(conversationId: string, replyId: string, userMessage: unkno
           await prisma.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
           send({ type: "done", userMessage, assistantMessage });
         } catch (error) {
+          if (error instanceof TextOnlyModelError) {
+            console.warn("Model is text only; discarding image message:", { conversationId, messageId: userMessage.id });
+            await discardTurn(userMessage, replyId).catch((cleanupError) =>
+              console.error("Could not discard image message:", cleanupError),
+            );
+            send({ type: "error", error: error.message, code: error.code });
+            return;
+          }
           const message = error instanceof Error ? error.message : "Model request failed";
           console.error("Message processing failed:", { conversationId, messageId: replyId, error });
           await prisma.message

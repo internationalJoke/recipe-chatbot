@@ -21,13 +21,21 @@ export function createModel(config: LlmConfig): LanguageModel {
   return createOpenRouter({ apiKey: config.apiKey, headers: { "X-Title": "Recipe Chatbot" } })(config.model);
 }
 
-// Only the most recent image-bearing message sends pixels; older images are
-// already described in the assistant's earlier replies. This keeps requests small.
-function latestImageMessageId(messages: MessageWithAttachments[]) {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i].attachments.some((a) => isImageMimeType(a.mimeType))) return messages[i].id;
+export const TEXT_ONLY_MESSAGE = "This model supports text only. Please send a text message without images.";
+
+/** Thrown when the model rejects image input, so callers can retry with text only. */
+export class TextOnlyModelError extends Error {
+  readonly code = "text_only";
+  constructor() {
+    super(TEXT_ONLY_MESSAGE);
   }
-  return null;
+}
+
+// Pixels go only with the newest message. Older images are described in the
+// assistant's earlier replies, so text follow-ups work on text-only models too.
+function latestImageMessageId(messages: MessageWithAttachments[]) {
+  const last = messages.at(-1);
+  return last?.attachments.some((a) => isImageMimeType(a.mimeType)) ? last.id : null;
 }
 
 async function toModelMessage(message: MessageWithAttachments, includeImages: boolean): Promise<ModelMessage> {
@@ -60,14 +68,23 @@ export async function buildModelMessages(history: MessageWithAttachments[]): Pro
   return Promise.all(history.map((message) => toModelMessage(message, message.id === imageMessageId)));
 }
 
+function providerMessage(error: APICallError) {
+  const data = error.data as { error?: { message?: unknown } } | undefined;
+  return typeof data?.error?.message === "string" ? data.error.message : error.message;
+}
+
+export function isImageUnsupported(error: unknown) {
+  return APICallError.isInstance(error) && /image input|vision|multimodal/i.test(providerMessage(error));
+}
+
 export function friendlyError(error: unknown): string {
   if (APICallError.isInstance(error)) {
     if (error.statusCode === 401 || error.statusCode === 403) {
       return "The model provider rejected the API key. Check your exported key.";
     }
     if (error.statusCode === 429) return "The model provider rate limit was reached. Wait a moment and try again.";
-    if (error.statusCode === 404) return "The model name was not found. Check GEMINI_MODEL / OPENROUTER_MODEL.";
-    return `Model provider error: ${error.message}`;
+    if (isImageUnsupported(error)) return TEXT_ONLY_MESSAGE;
+    return `Model provider error: ${providerMessage(error)}`;
   }
   return error instanceof Error ? error.message : "Model request failed";
 }
@@ -108,6 +125,7 @@ export async function streamChat(
   } catch (error) {
     if (clientSignal?.aborted) throw new Error("The request was canceled.");
     if (timeoutSignal.aborted) throw new Error("The model took too long to answer. Please try again.");
+    if (isImageUnsupported(error)) throw new TextOnlyModelError();
     throw new Error(friendlyError(error));
   }
 }

@@ -84,4 +84,4 @@ export type SendMessageStreamEvent =
   | { type: 'status'; status: 'answering' }
   | { type: 'chunk'; content: string }
   | ({ type: 'done' } & SendMessageResponse)
-  | { type: 'error'; error: string };
+  | { type: 'error'; error: string; code?: 'text_only' };

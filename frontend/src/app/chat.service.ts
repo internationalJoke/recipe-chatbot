@@ -9,6 +9,16 @@ import {
   ShoppingList,
 } from './models';
 
+/** A stream error the page can react to, e.g. code 'text_only' when the model can't read images. */
+export class ChatStreamError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
 @Injectable({ providedIn: 'root' })
 export class ChatService {
   private readonly http = inject(HttpClient);
@@ -73,7 +83,7 @@ export class ChatService {
           assistantMessage: event.assistantMessage,
         };
       }
-      if (event.type === 'error') throw new Error(event.error);
+      if (event.type === 'error') throw new ChatStreamError(event.error, event.code);
     };
 
     while (true) {

@@ -12,7 +12,7 @@ vi.mock("@/lib/files", () => ({
   readUpload: async (path: string) => Buffer.from(path.endsWith(".txt") ? "2 eggs, flour" : "PIXELS"),
 }));
 
-const { buildModelMessages, friendlyError, streamChat } = await import("@/lib/llm");
+const { buildModelMessages, friendlyError, streamChat, TextOnlyModelError } = await import("@/lib/llm");
 
 type Row = Message & { attachments: Attachment[] };
 let seq = 0;
@@ -58,6 +58,19 @@ describe("buildModelMessages", () => {
   });
 });
 
+describe("buildModelMessages with older photos", () => {
+  it("sends no pixels when a text follow-up comes after a photo", async () => {
+    const messages = await buildModelMessages([
+      row("USER", "what is this", [attachment("dish.png", "image/png")]),
+      row("ASSISTANT", "A lasagna."),
+      row("USER", "who are you"),
+    ]);
+
+    expect(messages.every((message) => typeof message.content === "string")).toBe(true);
+    expect(messages[0].content).toContain('Earlier image "dish.png"');
+  });
+});
+
 describe("streamChat", () => {
   beforeEach(() => vi.stubEnv("GEMINI_API_KEY", "test-key"));
   afterEach(() => vi.unstubAllEnvs());
@@ -86,6 +99,20 @@ describe("streamChat", () => {
     });
     await expect(streamChat([row("USER", "hi")], () => {})).rejects.toThrow(/rejected the API key/);
   });
+
+  it("throws TextOnlyModelError when the model rejects images", async () => {
+    mockModel.current = new MockLanguageModelV4({
+      doStream: async () => {
+        throw new APICallError({
+          message: "Not Found", url: "u", requestBodyValues: {}, statusCode: 404,
+          data: { error: { message: "No endpoints found that support image input" } },
+        });
+      },
+    });
+    const error = await streamChat([row("USER", "hi")], () => {}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TextOnlyModelError);
+    expect((error as TextOnlyModelError).code).toBe("text_only");
+  });
 });
 
 describe("friendlyError", () => {
@@ -94,8 +121,16 @@ describe("friendlyError", () => {
 
   it("maps common HTTP statuses", () => {
     expect(friendlyError(apiError(429))).toMatch(/rate limit/);
-    expect(friendlyError(apiError(404))).toMatch(/model name/);
     expect(friendlyError(apiError(500))).toBe("Model provider error: boom");
     expect(friendlyError(new Error("plain"))).toBe("plain");
+  });
+
+  it("says text only when the model rejects images", () => {
+    const withData = (message: string) =>
+      new APICallError({ message: "Not Found", url: "u", requestBodyValues: {}, statusCode: 404, data: { error: { message } } });
+    expect(friendlyError(withData("No endpoints found that support image input"))).toBe(
+      "This model supports text only. Please send a text message without images.",
+    );
+    expect(friendlyError(withData("model xyz does not exist"))).toBe("Model provider error: model xyz does not exist");
   });
 });
