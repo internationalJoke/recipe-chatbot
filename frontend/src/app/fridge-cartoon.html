@@ -1,0 +1,108 @@
+<svg viewBox="0 0 380 260" xmlns="http://www.w3.org/2000/svg" focusable="false">
+  <defs>
+    <radialGradient id="fridge-glow" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#fff7cf" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#fff7cf" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Floor -->
+  <ellipse cx="190" cy="240" rx="180" ry="14" fill="#e3f1df" />
+
+  <!-- Light spilling onto the floor -->
+  <path class="floor-light" d="M200 236 L320 236 L300 252 L150 252 Z" fill="#fff3c4" />
+
+  <!-- Fridge body -->
+  <rect x="190" y="22" width="140" height="216" rx="14" fill="#e6ecf0" stroke="#c7d1d9" stroke-width="3" />
+  <!-- Freezer door (closed) -->
+  <rect x="194" y="26" width="132" height="60" rx="10" fill="#f4f7f9" />
+  <rect x="204" y="44" width="5" height="26" rx="2.5" fill="#b8c3cc" />
+
+  <!-- Inside of the fridge -->
+  <rect x="198" y="94" width="124" height="138" rx="6" fill="#fffbea" />
+  <rect class="glow" x="198" y="94" width="124" height="138" rx="6" fill="url(#fridge-glow)" />
+  <line x1="200" y1="140" x2="320" y2="140" stroke="#dfe6ea" stroke-width="3" />
+  <line x1="200" y1="184" x2="320" y2="184" stroke="#dfe6ea" stroke-width="3" />
+
+  <!-- Top shelf: milk, jar, bottle -->
+  <rect x="208" y="106" width="17" height="32" rx="2" fill="#ffffff" stroke="#c9d6df" stroke-width="2" />
+  <rect x="208" y="114" width="17" height="8" fill="#7fb3e0" />
+  <rect x="234" y="117" width="20" height="21" rx="4" fill="#f2a64b" />
+  <rect x="233" y="113" width="22" height="6" rx="2" fill="#b5581a" />
+  <rect x="268" y="104" width="10" height="34" rx="4" fill="#5c9e6e" />
+  <rect x="270" y="98" width="6" height="8" rx="2" fill="#3f6f4c" />
+  <rect x="288" y="120" width="24" height="18" rx="5" fill="#f6c8d0" />
+
+  <!-- Middle shelf: tomatoes, broccoli, apple -->
+  <circle cx="218" cy="172" r="10" fill="#e2483b" />
+  <circle cx="238" cy="174" r="8" fill="#e85c47" />
+  <path d="M214 163 l4 -3 l4 3" stroke="#3f8f4a" stroke-width="2" fill="none" />
+  <circle cx="268" cy="166" r="8" fill="#4f9b4f" />
+  <circle cx="278" cy="162" r="8" fill="#5bab58" />
+  <circle cx="286" cy="168" r="7" fill="#4f9b4f" />
+  <rect x="274" y="170" width="6" height="12" fill="#6fae5c" />
+  <circle cx="306" cy="173" r="9" fill="#9ccc4a" />
+
+  <!-- Bottom: cheese and a drawer -->
+  <path d="M208 214 L240 202 L240 214 Z" fill="#f7d35c" />
+  <rect x="250" y="196" width="64" height="30" rx="6" fill="#e9f3f7" stroke="#cfdde5" stroke-width="2" />
+  <circle cx="268" cy="212" r="5" fill="#f5b0a0" />
+  <circle cx="282" cy="214" r="5" fill="#f5b0a0" />
+
+  <!-- Main door: swings open on its right hinge -->
+  <g class="door">
+    <rect x="190" y="90" width="140" height="148" rx="12" fill="#eef2f5" stroke="#c7d1d9" stroke-width="3" />
+    <rect x="204" y="118" width="5" height="40" rx="2.5" fill="#b8c3cc" />
+  </g>
+
+  <!-- Arm reaching toward the shelf (behind the body) -->
+  <path class="reach" d="M118 128 Q150 150 196 152" stroke="#3a7570" stroke-width="13" stroke-linecap="round" fill="none" />
+  <circle class="reach" cx="198" cy="152" r="6.5" fill="#f1c39c" />
+
+  <!-- Legs and shoes -->
+  <rect x="94" y="182" width="14" height="52" rx="7" fill="#5b4636" />
+  <rect x="112" y="182" width="14" height="52" rx="7" fill="#5b4636" />
+  <ellipse cx="104" cy="236" rx="12" ry="5" fill="#2f2620" />
+  <ellipse cx="122" cy="236" rx="12" ry="5" fill="#2f2620" />
+
+  <!-- Body -->
+  <rect class="torso" x="82" y="106" width="58" height="84" rx="24" fill="#3f7f7a" />
+
+  <!-- Arm bent up to the chin: "hmm…" -->
+  <path d="M124 120 L134 158 L138 104" stroke="#468b85" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <g class="hand">
+    <circle cx="139" cy="100" r="7" fill="#f1c39c" />
+    <rect x="137" y="88" width="5" height="12" rx="2.5" fill="#f1c39c" />
+  </g>
+
+  <!-- Head -->
+  <g class="head">
+    <g class="ponytail">
+      <ellipse cx="84" cy="88" rx="9" ry="22" fill="#6b3f22" transform="rotate(18 84 88)" />
+      <circle cx="90" cy="70" r="6" fill="#2b2b2b" />
+    </g>
+    <circle cx="110" cy="72" r="26" fill="#6b3f22" />
+    <ellipse cx="121" cy="80" rx="19" ry="22" fill="#f3c9a4" />
+    <path d="M100 56 Q122 46 138 64 Q124 58 108 64 Z" fill="#6b3f22" />
+    <circle cx="109" cy="83" r="5" fill="#eab48e" />
+    <circle cx="109" cy="89" r="1.6" fill="#d9d9d9" />
+    <!-- Glasses -->
+    <line x1="111" y1="76" x2="124" y2="77" stroke="#3b2a3a" stroke-width="2" />
+    <rect x="124" y="71" width="13" height="11" rx="4" fill="#ffffff" fill-opacity="0.35" stroke="#3b2a3a" stroke-width="2.2" />
+    <ellipse class="eye" cx="131" cy="77" rx="1.8" ry="2.2" fill="#2b2b2b" />
+    <path d="M128 68 Q132 65 136 68" stroke="#6b3f22" stroke-width="2" fill="none" stroke-linecap="round" />
+    <!-- Nose and puzzled mouth -->
+    <path d="M138 80 Q143 86 137 88" stroke="#d9a07c" stroke-width="2" fill="none" stroke-linecap="round" />
+    <path d="M128 95 Q132 93 135 96" stroke="#b36b55" stroke-width="2" fill="none" stroke-linecap="round" />
+  </g>
+
+  <!-- Thought bubble -->
+  <g class="thought">
+    <circle cx="146" cy="52" r="3" fill="#ffffff" stroke="#e8d6c3" stroke-width="1.5" />
+    <circle cx="154" cy="40" r="4.5" fill="#ffffff" stroke="#e8d6c3" stroke-width="1.5" />
+    <g class="bubble">
+      <circle cx="170" cy="20" r="15" fill="#ffffff" stroke="#e8d6c3" stroke-width="2" />
+      <text x="170" y="27" text-anchor="middle" font-size="20" font-weight="700" fill="#b5581a" font-family="Georgia, serif">?</text>
+    </g>
+  </g>
+</svg>

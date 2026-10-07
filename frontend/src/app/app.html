@@ -69,7 +69,7 @@
     <section #messageList class="messages" aria-live="polite">
       @if (!activeConversation()?.messages?.length) {
         <div class="welcome">
-          <div class="welcome-icon">🍳</div>
+          <app-fridge-cartoon class="welcome-cartoon" />
           <p class="eyebrow">Recipes · photos · grocery shopping</p>
           <h2>What should we cook today?</h2>
           <p>Send a photo of your fridge, a dish, or a recipe — or just type. When you need ingredients, I list them here. Nothing is bought until you click Accept.</p>
@@ -131,6 +131,7 @@
           <div class="message-body">
             <div class="message-meta"><strong>Chef</strong></div>
             <div class="thinking-status" role="status">
+              <app-fridge-cartoon size="sm" />
               <span>{{ thinkingStatus() }}</span>
               <span class="typing" aria-hidden="true"><span></span><span></span><span></span></span>
             </div>

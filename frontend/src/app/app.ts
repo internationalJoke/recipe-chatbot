@@ -21,6 +21,7 @@ import {
   Message,
   ShoppingList,
 } from './models';
+import { FridgeCartoon } from './fridge-cartoon';
 import { ShoppingListCard } from './shopping-list-card';
 
 // The model's machine-readable list is hidden while it streams; the server strips it on save.
@@ -29,7 +30,7 @@ const STOP_RELOAD_DELAY_MS = 800;
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, FormsModule, ShoppingListCard],
+  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.css',
@@ -87,6 +88,7 @@ export class App implements OnInit {
     this.clearFiles();
     this.error.set('');
     this.sidebarOpen.set(false);
+    this.messageList?.nativeElement.scrollTo({ top: 0 });
   }
 
   onFilesSelected(event: Event) {

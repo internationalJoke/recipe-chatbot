@@ -1,0 +1,70 @@
+:host { display: block; width: 300px; max-width: 100%; margin: 0 auto; }
+:host(.small) { width: 84px; margin: 0; flex: 0 0 84px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+/* All parts rotate/scale around their own box, not the SVG origin. */
+.door, .head, .ponytail, .hand, .torso, .bubble, .eye, .reach { transform-box: fill-box; }
+
+/* Door swings open once, then stays open. */
+.door { transform-origin: right center; animation: door-open 1.6s cubic-bezier(.5,0,.2,1) .3s both; }
+@keyframes door-open {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(-0.32); filter: brightness(.9); }
+}
+
+/* Fridge light switches on as the door opens, then gently flickers. */
+.glow, .floor-light { opacity: 0; animation: light-on .6s ease .9s forwards, flicker 4s ease-in-out 2s infinite; }
+.floor-light { animation-name: light-on, floor-flicker; }
+@keyframes light-on { to { opacity: 1; } }
+@keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: .75; } }
+@keyframes floor-flicker { 0%, 100% { opacity: .7; } 50% { opacity: .45; } }
+
+/* Reaching arm only appears once the fridge is open. */
+.reach { opacity: 0; animation: reach-in .8s ease 1.6s forwards, reach 5s ease-in-out 2.4s infinite; transform-origin: left center; }
+@keyframes reach-in { to { opacity: 1; } }
+@keyframes reach { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-6px) translateY(3px); } }
+
+/* Looking around, unsure what to cook. */
+.head { transform-origin: 40% 100%; animation: ponder 5s ease-in-out infinite; }
+@keyframes ponder {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-6deg) translateY(-1px); }
+  55% { transform: rotate(4deg); }
+  75% { transform: rotate(-2deg); }
+}
+.ponytail { transform-origin: 80% 10%; animation: sway 2.5s ease-in-out infinite; }
+@keyframes sway { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(9deg); } }
+
+/* Tapping a finger on the chin. */
+.hand { transform-origin: center; animation: tap 1.2s ease-in-out infinite; }
+@keyframes tap { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+.torso { transform-origin: center bottom; animation: breathe 3.2s ease-in-out infinite; }
+@keyframes breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.025); } }
+
+.eye { transform-origin: center; animation: blink 4.5s infinite; }
+@keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+
+/* "?" pops in, wobbles, and fades out on a loop. */
+.thought { opacity: 0; animation: thought 3.6s ease-in-out 1.4s infinite; }
+@keyframes thought { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
+.bubble { transform-origin: center; animation: pop 3.6s ease-in-out 1.4s infinite; }
+@keyframes pop {
+  0% { transform: scale(0); }
+  15% { transform: scale(1.15); }
+  22% { transform: scale(1); }
+  40% { transform: rotate(-8deg); }
+  55% { transform: rotate(8deg); }
+  70%, 80% { transform: rotate(0deg) scale(1); }
+  100% { transform: scale(0); }
+}
+
+/* In the small "thinking" version, skip the door intro and show the fridge already open. */
+:host(.small) .door { animation-duration: .01s; animation-delay: 0s; }
+:host(.small) .glow, :host(.small) .floor-light, :host(.small) .reach { animation-delay: 0s, 0s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .door { animation: none; transform: scaleX(-0.32); }
+  .glow, .floor-light, .reach, .thought { animation: none; opacity: 1; }
+  .head, .ponytail, .hand, .torso, .eye, .bubble { animation: none; }
+}
