@@ -40,7 +40,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-liquid/lfm-2.5-2.6b:free}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-dots-studio/dots-3-note-preview:free}
       UPLOAD_DIR: /app/uploads
     volumes:
       - uploads_data:/app/uploads

@@ -19,7 +19,7 @@ const PROVIDERS = {
   openrouter: {
     keyVar: "OPENROUTER_API_KEY",
     modelVar: "OPENROUTER_MODEL",
-    defaultModel: "liquid/lfm-2.5-2.6b:free",
+    defaultModel: "dots-studio/dots-3-note-preview:free",
   },
 } as const;
 
