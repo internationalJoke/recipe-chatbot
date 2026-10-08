@@ -117,6 +117,22 @@ button { color: inherit; }
 .file-card { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink-soft); background: var(--surface); text-decoration: none; font-size: 12px; }
 .file-card span { color: var(--orange); font-size: 9px; font-weight: 800; }
 
+/* Tool use (web search) shown above an answer */
+.tool-chip { width: fit-content; max-width: 100%; margin: 0 0 8px; border: 1px solid #cfe6d3; border-radius: 12px; background: var(--leaf-soft); font-size: 12px; }
+.tool-chip summary { display: flex; align-items: center; gap: 6px; padding: 6px 12px; color: var(--leaf-dark); font-weight: 600; cursor: pointer; list-style: none; }
+.tool-chip summary::-webkit-details-marker { display: none; }
+.tool-chip summary::after { content: "▾"; margin-left: 2px; font-size: 10px; transition: transform .15s ease; }
+.tool-chip[open] summary::after { transform: rotate(180deg); }
+.tool-chip em { overflow: hidden; max-width: 320px; color: var(--ink-soft); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.tool-chip small { color: var(--muted); font-weight: 500; }
+.tool-chip ul { margin: 0; padding: 2px 14px 10px 30px; }
+.tool-chip li { margin: 4px 0; color: var(--ink); }
+.tool-chip li a { color: var(--leaf-dark); }
+.tool-chip li span { margin-left: 6px; color: var(--muted); font-size: 11px; }
+.tool-chip.failed { border-color: #f6c4be; background: var(--tomato-soft); }
+.tool-chip.failed summary { color: #a3302a; }
+.tool-error { margin: 0; padding: 0 14px 8px; color: #a3302a; }
+
 /* Image viewer */
 .lightbox { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 48px 16px; background: rgba(20, 40, 28, .78); cursor: zoom-out; }
 .lightbox img { max-width: min(1100px,100%); max-height: 100%; object-fit: contain; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.35); cursor: default; }

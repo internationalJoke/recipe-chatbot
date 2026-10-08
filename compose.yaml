@@ -41,6 +41,7 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-dots-studio/dots-3-note-preview:free}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       UPLOAD_DIR: /app/uploads
     volumes:
       - uploads_data:/app/uploads

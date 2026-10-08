@@ -7,6 +7,7 @@ import {
   SendMessageResponse,
   SendMessageStreamEvent,
   ShoppingList,
+  StreamStatus,
 } from './models';
 
 /** A stream error the page can react to, e.g. code 'text_only' when the model can't read images. */
@@ -46,6 +47,7 @@ export class ChatService {
     files: File[],
     onChunk: (chunk: string) => void,
     signal?: AbortSignal,
+    onStatus?: (status: StreamStatus, query?: string) => void,
   ): Promise<SendMessageResponse> {
     const formData = new FormData();
     formData.append('content', content);
@@ -79,6 +81,7 @@ export class ChatService {
         throw new Error('The server returned an invalid message stream.');
       }
 
+      if (event.type === 'status') onStatus?.(event.status, event.query);
       if (event.type === 'chunk') onChunk(event.content);
       if (event.type === 'done') {
         completed = {

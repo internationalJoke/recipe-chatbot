@@ -45,6 +45,8 @@ model Message {
   model          String?       @db.VarChar(120)
   attachments    Attachment[]
   shoppingList   ShoppingList?
+  // Tools used for this reply, e.g. web searches with their sources.
+  toolActivity   Json?
   createdAt      DateTime      @default(now())
 
   @@index([conversationId, createdAt])

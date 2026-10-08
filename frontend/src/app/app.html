@@ -115,6 +115,25 @@
               <span>{{ formatDate(message.createdAt) }}</span>
             </div>
 
+            @for (activity of message.toolActivity ?? []; track $index) {
+              <details class="tool-chip" [class.failed]="activity.error">
+                <summary>
+                  <span aria-hidden="true">🔍</span>
+                  {{ activity.error ? 'Web search failed' : 'Searched the web' }}
+                  @if (activity.query) { <em>“{{ activity.query }}”</em> }
+                  @if (activity.sources.length) { <small>· {{ activity.sources.length }} sources</small> }
+                </summary>
+                @if (activity.error) {
+                  <p class="tool-error">{{ activity.error }}</p>
+                }
+                <ul>
+                  @for (source of activity.sources; track source.url) {
+                    <li><a [href]="source.url" target="_blank" rel="noopener noreferrer">{{ source.title }}</a> <span>{{ hostOf(source.url) }}</span></li>
+                  }
+                </ul>
+              </details>
+            }
+
             @if (message.content) {
               <p class="message-text">
                 @for (part of messageParts(message.content); track $index) {

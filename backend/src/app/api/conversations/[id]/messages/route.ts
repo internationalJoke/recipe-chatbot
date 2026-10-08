@@ -4,6 +4,7 @@ import { streamChat, TextOnlyModelError } from "@/lib/llm";
 import { describeLlm } from "@/lib/llm-config";
 import { MAX_FILES, removeUpload, saveUpload, validateUpload } from "@/lib/files";
 import { extractShoppingList } from "@/lib/shopping-list";
+import { queryOf } from "@/lib/tool-activity";
 
 export const runtime = "nodejs";
 
@@ -146,6 +147,12 @@ function replyStream(
               send({ type: "chunk", content: chunk });
             },
             operationAbort.signal,
+            (toolName, input) =>
+              send({
+                type: "status",
+                status: toolName === "webSearch" ? "searching" : "using_tool",
+                ...(queryOf(input) ? { query: queryOf(input) } : {}),
+              }),
           );
 
           const { text, items } = extractShoppingList(reply.content);
@@ -155,6 +162,7 @@ function replyStream(
               content: text || "Here is the shopping list for this recipe.",
               model: reply.model,
               status: "COMPLETE",
+              ...(reply.toolActivity.length > 0 ? { toolActivity: reply.toolActivity } : {}),
               ...(items ? { shoppingList: { create: { items } } } : {}),
             },
             include: { attachments: true, shoppingList: { include: { order: true } } },

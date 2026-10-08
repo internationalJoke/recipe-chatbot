@@ -55,6 +55,7 @@ export interface Message {
   model?: string;
   attachments: Attachment[];
   shoppingList?: ShoppingList | null;
+  toolActivity?: ToolActivity[] | null;
   createdAt: string;
 }
 
@@ -82,8 +83,17 @@ export interface Health {
   error: string | null;
 }
 
+export interface ToolActivity {
+  tool: string;
+  query?: string;
+  sources: { title: string; url: string }[];
+  error?: string;
+}
+
+export type StreamStatus = 'answering' | 'searching' | 'using_tool';
+
 export type SendMessageStreamEvent =
-  | { type: 'status'; status: 'answering' }
+  | { type: 'status'; status: StreamStatus; query?: string }
   | { type: 'chunk'; content: string }
   | ({ type: 'done' } & SendMessageResponse)
   | { type: 'error'; error: string; code?: 'text_only' };

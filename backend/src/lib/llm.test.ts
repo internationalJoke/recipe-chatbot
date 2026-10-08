@@ -20,7 +20,7 @@ const attachment = (originalName: string, mimeType: string): Attachment => ({
   id: `a${++seq}`, messageId: "m", originalName, mimeType, fileSize: 1, storagePath: originalName, createdAt: new Date(),
 });
 const row = (role: Row["role"], content: string, attachments: Attachment[] = []): Row => ({
-  id: `m${++seq}`, conversationId: "c", role, content, status: "COMPLETE", model: null, attachments, createdAt: new Date(),
+  id: `m${++seq}`, conversationId: "c", role, content, status: "COMPLETE", model: null, toolActivity: null, attachments, createdAt: new Date(),
 });
 
 const usage = {
@@ -81,9 +81,117 @@ describe("streamChat", () => {
     const reply = await streamChat([row("USER", "hi")], (chunk) => chunks.push(chunk));
 
     expect(chunks).toEqual(["Hello ", "chef"]);
-    expect(reply).toEqual({ content: "Hello chef", model: "gemini-3.8-flash" });
+    expect(reply).toEqual({ content: "Hello chef", model: "gemini-3.8-flash", toolActivity: [] });
     const call = mockModel.current.doStreamCalls[0];
     expect(call.prompt[0]).toMatchObject({ role: "system" });
+  });
+
+  it("runs the webSearch tool, reports it, and streams the final answer", async () => {
+    vi.stubEnv("TAVILY_API_KEY", "tvly-test");
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ results: [{ title: "Basil", url: "https://example.com/basil", content: "Summer herb" }] })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const stream = (parts: unknown[]) => ({ stream: convertArrayToReadableStream(parts as never[]) });
+    mockModel.current = new MockLanguageModelV4({
+      doStream: [
+        stream([
+          { type: "tool-call", toolCallId: "c1", toolName: "webSearch", input: JSON.stringify({ query: "basil season" }) },
+          { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_calls" }, usage },
+        ]),
+        stream([
+          { type: "text-start", id: "t" },
+          { type: "text-delta", id: "t", delta: "Basil peaks in summer." },
+          { type: "text-end", id: "t" },
+          { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage },
+        ]),
+      ],
+    });
+
+    try {
+      const tools: string[] = [];
+      const reply = await streamChat([row("USER", "when is basil in season?")], () => {}, undefined, (name) => tools.push(name));
+
+      expect(tools).toEqual(["webSearch"]);
+      expect(reply.content).toBe("Basil peaks in summer.");
+      expect(reply.toolActivity).toEqual([
+        { tool: "webSearch", query: "basil season", sources: [{ title: "Basil", url: "https://example.com/basil" }] },
+      ]);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const secondCall = JSON.stringify(mockModel.current.doStreamCalls[1].prompt);
+      expect(secondCall).toContain("https://example.com/basil");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("retries with inlined results when the model fails after a tool call", async () => {
+    vi.stubEnv("TAVILY_API_KEY", "tvly-test");
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ results: [{ title: "Veg", url: "https://example.com/veg", content: "Kale in October" }] })),
+    ));
+    const stream = (parts: unknown[]) => ({ stream: convertArrayToReadableStream(parts as never[]) });
+    let call = 0;
+    mockModel.current = new MockLanguageModelV4({
+      doStream: async () => {
+        call += 1;
+        if (call === 1) {
+          return stream([
+            { type: "text-start", id: "t0" },
+            { type: "text-delta", id: "t0", delta: "\n\n" },
+            { type: "text-end", id: "t0" },
+            { type: "tool-call", toolCallId: "c1", toolName: "webSearch", input: JSON.stringify({ query: "veg october" }) },
+            { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_calls" }, usage },
+          ]);
+        }
+        if (call === 2) {
+          throw new APICallError({ message: "provider_unavailable", url: "u", requestBodyValues: {}, statusCode: 502, isRetryable: false });
+        }
+        return stream([
+          { type: "text-start", id: "t" },
+          { type: "text-delta", id: "t", delta: "Kale is in season." },
+          { type: "text-end", id: "t" },
+          { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage },
+        ]);
+      },
+    });
+
+    try {
+      const reply = await streamChat([row("USER", "veg in october?")], () => {});
+      expect(reply.content.trim()).toBe("Kale is in season.");
+      expect(call).toBe(3);
+      const retryPrompt = JSON.stringify(mockModel.current.doStreamCalls[2].prompt);
+      expect(retryPrompt).toContain("tool_results");
+      expect(retryPrompt).toContain("https://example.com/veg");
+      expect(mockModel.current.doStreamCalls[2].tools ?? []).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("retries a mid-stream provider failure, but not a bad key", async () => {
+    const providerDown = () =>
+      new APICallError({ message: "provider_unavailable", url: "u", requestBodyValues: {}, statusCode: 502, isRetryable: false });
+    let calls = 0;
+    mockModel.current = new MockLanguageModelV4({
+      doStream: async () => {
+        calls += 1;
+        if (calls === 1) throw providerDown();
+        return streamingModel("Fresh kale.").doStream({} as never);
+      },
+    });
+    await expect(streamChat([row("USER", "hi")], () => {})).resolves.toMatchObject({ content: "Fresh kale." });
+    expect(calls).toBe(2);
+
+    calls = 0;
+    mockModel.current = new MockLanguageModelV4({
+      doStream: async () => {
+        calls += 1;
+        throw new APICallError({ message: "bad key", url: "u", requestBodyValues: {}, statusCode: 401 });
+      },
+    });
+    await expect(streamChat([row("USER", "hi")], () => {})).rejects.toThrow(/rejected the API key/);
+    expect(calls).toBe(1);
   });
 
   it("rejects an empty answer", async () => {

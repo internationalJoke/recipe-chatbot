@@ -31,6 +31,17 @@ const STOP_RELOAD_DELAY_MS = 800;
 const SIDEBAR_KEY = 'recipe-box.sidebar-collapsed';
 const PROVIDER_NAMES: Record<string, string> = { gemini: 'Gemini', openrouter: 'OpenRouter' };
 
+// While streaming, models send stray blank lines and the start of the hidden shopping-list tag.
+// Trim them the same way the server does on save, so the bubble doesn't jump when it finishes.
+export function cleanForDisplay(raw: string) {
+  const tagAt = raw.indexOf(LIST_TAG);
+  let text = tagAt === -1 ? raw : raw.slice(0, tagAt);
+  const partialTag = text.lastIndexOf('<');
+  if (partialTag !== -1 && LIST_TAG.startsWith(text.slice(partialTag)))
+    text = text.slice(0, partialTag);
+  return text.replace(/\n[ \t]*(?:\n[ \t]*){2,}/g, '\n\n').trim();
+}
+
 function readCollapsed() {
   try {
     return localStorage.getItem(SIDEBAR_KEY) === '1';
@@ -171,8 +182,7 @@ export class App implements OnInit {
   }
 
   messageParts(raw: string): { text: string; url?: string }[] {
-    const tagAt = raw.indexOf(LIST_TAG);
-    const content = tagAt === -1 ? raw : raw.slice(0, tagAt).trimEnd();
+    const content = cleanForDisplay(raw);
     const parts: { text: string; url?: string }[] = [];
     const urlPattern = /https:\/\/[^\s]+/g;
     let offset = 0;
@@ -242,6 +252,11 @@ export class App implements OnInit {
         content,
         files,
         (chunk) => {
+          const started = this.activeConversation()?.messages.some(
+            (message) => message.id === streamingMessageId,
+          );
+          // Models sometimes send blank lines before calling a tool; don't open an empty bubble.
+          if (!started && !chunk.trim()) return;
           this.streaming.set(true);
           this.activeConversation.update((conversation) => {
             if (!conversation || conversation.id !== conversationId) return conversation;
@@ -254,7 +269,7 @@ export class App implements OnInit {
                 id: streamingMessageId,
                 conversationId,
                 role: 'ASSISTANT',
-                content: chunk,
+                content: chunk.trimStart(),
                 status: 'PENDING',
                 attachments: [],
                 createdAt: new Date().toISOString(),
@@ -274,6 +289,18 @@ export class App implements OnInit {
           this.scrollToBottom();
         },
         abortController.signal,
+        (status, query) => {
+          if (status === 'answering') return;
+          // Show the status bubble again, even if some text already streamed in.
+          this.thinkingStatus.set(
+            status === 'searching'
+              ? query
+                ? `🔍 Searching the web for “${query}”…`
+                : '🔍 Searching the web…'
+              : 'Checking something…',
+          );
+          this.streaming.set(false);
+        },
       );
       this.activeConversation.set(await firstValueFrom(this.chat.getConversation(conversationId)));
       releasePreviews();
@@ -409,6 +436,14 @@ export class App implements OnInit {
   @HostListener('document:keydown.escape')
   onEscape() {
     this.closeImage();
+  }
+
+  hostOf(url: string) {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return '';
+    }
   }
 
   attachmentUrl(attachment: Attachment) {

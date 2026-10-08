@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { describeLlm } from "@/lib/llm-config";
+import { webSearchApiKey } from "@/lib/web-search";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,7 @@ export async function GET() {
     provider: llm.provider,
     model: llm.model,
     error: llm.error,
+    webSearch: webSearchApiKey() ? "on" : "off",
   };
 
   try {
