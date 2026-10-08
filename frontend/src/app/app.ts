@@ -29,6 +29,7 @@ import { ShoppingListCard } from './shopping-list-card';
 const LIST_TAG = '<shopping_list>';
 const STOP_RELOAD_DELAY_MS = 800;
 const SIDEBAR_KEY = 'recipe-box.sidebar-collapsed';
+const PROVIDER_NAMES: Record<string, string> = { gemini: 'Gemini', openrouter: 'OpenRouter' };
 
 function readCollapsed() {
   try {
@@ -152,7 +153,8 @@ export class App implements OnInit {
   modelLabel() {
     const health = this.health();
     if (!health) return 'Model offline';
-    return health.model ? `${health.provider} · ${health.model}` : 'Model not configured';
+    if (health.llm !== 'ok') return 'Model not configured';
+    return PROVIDER_NAMES[health.provider ?? ''] ?? 'Model ready';
   }
 
   onListChanged(messageId: string, list: ShoppingList) {

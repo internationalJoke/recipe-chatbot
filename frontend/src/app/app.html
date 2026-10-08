@@ -87,7 +87,6 @@
         <p>Conversation</p>
         <h1>{{ activeConversation()?.title || 'New conversation' }}</h1>
       </div>
-      <div class="model-pill" [class.offline]="health()?.llm !== 'ok'" [title]="health()?.error || ''"><span></span> {{ modelLabel() }}</div>
     </header>
 
     <section #messageList class="messages" aria-live="polite">
