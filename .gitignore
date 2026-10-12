@@ -7,3 +7,5 @@ backend/.next/
 frontend/node_modules/
 frontend/dist/
 frontend/.angular/
+**/.idea/
+*.iml
