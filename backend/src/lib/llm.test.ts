@@ -6,6 +6,12 @@ import type { Attachment, Message } from "@/generated/prisma/client";
 const mockModel = { current: null as MockLanguageModelV4 | null };
 
 vi.mock("@ai-sdk/google", () => ({ createGoogle: () => () => mockModel.current }));
+vi.mock("@/lib/recipe-service", () => ({
+  RecipeServiceError: class extends Error {},
+  recommendRecipes: async () => [
+    { recipe_id: 7, recipe_name: "Tortilla", coverage: 0.5, matched: ["egg", "potato"], missing: ["onion"], required: ["egg", "onion", "potato"] },
+  ],
+}));
 vi.mock("@/lib/files", () => ({
   isImageMimeType: (type: string) => type.startsWith("image/"),
   isTextMimeType: (type: string) => type.startsWith("text/"),
@@ -20,7 +26,7 @@ const attachment = (originalName: string, mimeType: string): Attachment => ({
   id: `a${++seq}`, messageId: "m", originalName, mimeType, fileSize: 1, storagePath: originalName, createdAt: new Date(),
 });
 const row = (role: Row["role"], content: string, attachments: Attachment[] = []): Row => ({
-  id: `m${++seq}`, conversationId: "c", role, content, status: "COMPLETE", model: null, toolActivity: null, dishes: null, selectedDishId: null, attachments, createdAt: new Date(),
+  id: `m${++seq}`, conversationId: "c", role, content, status: "COMPLETE", model: null, toolActivity: null, dishes: null, selectedDishIds: [], attachments, createdAt: new Date(),
 });
 
 const usage = {
@@ -299,11 +305,10 @@ describe("streamChat", () => {
 
   it("returns dish cards and holds back the shopping list until a dish is picked", async () => {
     const stream = (parts: unknown[]) => ({ stream: convertArrayToReadableStream(parts as never[]) });
-    const dishes = [{ name: "Tortilla", summary: "Eggs and potatoes.", ingredients: [{ name: "eggs", quantity: 5, unit: "pcs" }] }];
     mockModel.current = new MockLanguageModelV4({
       doStream: [
         stream([
-          { type: "tool-call", toolCallId: "d1", toolName: "suggestDishes", input: JSON.stringify({ dishes }) },
+          { type: "tool-call", toolCallId: "d1", toolName: "suggestDishes", input: JSON.stringify({ ingredients: ["egg", "potato"] }) },
           { type: "tool-call", toolCallId: "s1", toolName: "proposeShoppingList", input: JSON.stringify({ items: [{ name: "eggs", quantity: 5, unit: "pcs" }] }) },
           { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_calls" }, usage },
         ]),
@@ -317,7 +322,7 @@ describe("streamChat", () => {
     });
     const statuses: string[] = [];
     const reply = await streamChat([row("USER", "what can I cook with potatoes?")], () => {}, undefined, (name) => statuses.push(name));
-    expect(reply.dishes).toEqual([expect.objectContaining({ name: "Tortilla", imageUrl: null, id: expect.any(String) })]);
+    expect(reply.dishes).toEqual([expect.objectContaining({ name: "Tortilla", imageUrl: null, id: expect.any(String), recipeId: 7, missing: ["onion"] })]);
     expect(reply.shoppingItems).toEqual([]);
     expect(reply.toolActivity).toEqual([]);
     expect(statuses).toContain("suggestDishes");

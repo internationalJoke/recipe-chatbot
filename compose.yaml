@@ -54,7 +54,7 @@ services:
       migrate:
         condition: service_completed_successfully
       recipe-service:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -70,6 +70,13 @@ services:
       context: ./recipe-service
     ports:
       - "8000:8000"
+    # Loading the recipe CSVs takes a while; the backend waits until /health answers.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
     restart: unless-stopped
 
 volumes:

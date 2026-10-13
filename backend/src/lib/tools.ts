@@ -1,6 +1,7 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import { buildDishes, dishInputSchema, MAX_DISHES } from "@/lib/dishes";
+import { buildDishes, dishesFromRecipes } from "@/lib/dishes";
+import { recommendRecipes, RecipeServiceError } from "@/lib/recipe-service";
 import { searchImage, searchWeb, webSearchApiKey, WebSearchError } from "@/lib/web-search";
 
 // Tools the model may call. Add new ones in buildChatTools() with `tool()` from "ai".
@@ -59,160 +60,56 @@ export const proposeShoppingListTool = tool({
 });
 
 export const SUGGEST_DISHES = "suggestDishes";
+const DISH_TOOL_LIMIT = 3;
 
-// Shows 2-4 dish ideas as cards with a photo each. The user picks one, then gets the full
-// recipe and the shopping list in the next turn.
-function suggestDishesTool(withPhotos: boolean) {
+// Shows recipes from the recipe database as cards with a photo each. The user picks one or
+// more; the backend then asks the database what is missing and builds the shopping list.
+function suggestDishesTool(withPhotos: boolean, env: Record<string, string | undefined>) {
   return tool({
     description:
-      "Show the user 2 to 3 dish ideas as cards, each with a photo, ingredients, and short steps. " +
-      "Use it whenever you suggest what to cook and the user has not picked a dish yet. " +
-      "After calling it, write only a short intro and ask which dish they want to make.",
-    inputSchema: z.object({ dishes: z.array(dishInputSchema).min(1).max(MAX_DISHES) }),
-    execute: async ({ dishes }, { abortSignal }) => {
+      "Find recipes in the recipe database that use the ingredients the user has, and show them as cards " +
+      "with a photo. Use it whenever the user asks what to cook, or sends ingredients or a fridge photo, " +
+      "and has not picked a dish yet. After calling it, write only a short intro and ask which dishes they want.",
+    inputSchema: z.object({
+      ingredients: z
+        .array(z.string().trim().min(1).max(60))
+        .min(1)
+        .max(30)
+        .describe('Ingredients the user has, as short singular English names, e.g. ["tomato", "egg", "onion"]'),
+    }),
+    execute: async ({ ingredients }, { abortSignal }) => {
+      let recipes;
+      try {
+        recipes = await recommendRecipes(ingredients, DISH_TOOL_LIMIT, { env, signal: abortSignal });
+      } catch (error) {
+        if (error instanceof RecipeServiceError) return { error: error.message, dishes: [] };
+        throw error;
+      }
+      if (recipes.length === 0) {
+        return {
+          dishes: [],
+          message:
+            "No recipe in the database matches these ingredients. Tell the user, and ask for more ingredients. " +
+            "Do not invent recipes.",
+        };
+      }
       const finder = withPhotos ? (name: string, signal?: AbortSignal) => searchImage(`${name} dish`, { signal }) : null;
+      const dishes = await buildDishes(dishesFromRecipes(recipes, ingredients), finder, abortSignal);
       return {
-        dishes: await buildDishes(dishes, finder, abortSignal),
+        dishes,
         message:
-          "The dishes are now shown to the user as cards. Do not list them again. " +
-          "Ask which one they want to make. Do not propose a shopping list yet.",
+          "The dishes are now shown to the user as cards, from the recipe database. Do not list them again " +
+          "and do not invent other recipes. Ask which ones they want to make. Do not propose a shopping list yet.",
       };
     },
   });
 }
 
-export const recipeRecommendationTool = tool({
-  description:
-    "Recommend recipes from the recipe database based on ingredients the user already has.",
-
-  inputSchema: z.object({
-    ingredients: z
-      .array(z.string())
-      .min(1)
-      .describe(
-        "Ingredients the user currently has"
-      ),
-
-    topK: z
-      .number()
-      .int()
-      .min(1)
-      .max(10)
-      .default(5),
-  }),
-
-  execute: async ({
-    ingredients,
-    topK,
-  }) => {
-
-    const baseUrl =
-      process.env.RECIPE_SERVICE_URL ??
-      "http://recipe-service:8000";
-
-    const response = await fetch(
-      `${baseUrl}/recommend`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
-          available_ingredients:
-            ingredients,
-
-          top_k:
-            topK,
-
-          min_coverage:
-            0.3,
-
-          max_missing_ingredients:
-            4,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Recipe recommendation service failed: ${response.status}`
-      );
-    }
-
-    return await response.json();
-  },
-});
-
-
-export const recipeMissingIngredientsTool = tool({
-  description:
-    "Get the exact missing ingredients for a selected recipe based on ingredients the user already has.",
-
-  inputSchema: z.object({
-
-    recipeId: z
-      .number()
-      .int()
-      .describe(
-        "The selected recipe ID"
-      ),
-
-    ingredients: z
-      .array(z.string())
-      .describe(
-        "Ingredients the user currently has"
-      ),
-  }),
-
-  execute: async ({
-    recipeId,
-    ingredients,
-  }) => {
-
-    const baseUrl =
-      process.env.RECIPE_SERVICE_URL ??
-      "http://recipe-service:8000";
-
-    const response = await fetch(
-      `${baseUrl}/missing`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
-          recipe_id:
-            recipeId,
-
-          available_ingredients:
-            ingredients,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Missing ingredient service failed: ${response.status}`
-      );
-    }
-
-    return await response.json();
-  },
-});
-
 export function buildChatTools(env: Record<string, string | undefined> = process.env): ToolSet {
   const canSearch = Boolean(webSearchApiKey(env));
   return {
-    [SUGGEST_DISHES]: suggestDishesTool(canSearch),
+    [SUGGEST_DISHES]: suggestDishesTool(canSearch, env),
     [PROPOSE_SHOPPING_LIST]: proposeShoppingListTool,
-    recipeRecommendation: recipeRecommendationTool,
-    recipeMissingIngredients: recipeMissingIngredientsTool,
     ...(canSearch ? { webSearch: webSearchTool } : {}),
   };
 }

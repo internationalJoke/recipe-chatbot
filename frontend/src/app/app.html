@@ -165,9 +165,10 @@
             @if (message.dishes?.length) {
               <app-dish-cards
                 [dishes]="message.dishes!"
-                [selectedId]="message.selectedDishId"
+                [selectedIds]="message.selectedDishIds"
                 [disabled]="loading()"
-                (chosen)="chooseDish(message, $event)"
+                [busy]="choosingFor() === message.id"
+                (chosen)="chooseDishes(message, $event)"
               />
             }
 

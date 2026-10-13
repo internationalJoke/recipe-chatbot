@@ -16,7 +16,6 @@ import { ChatService, ChatStreamError } from './chat.service';
 import {
   Attachment,
   Conversation,
-  Dish,
   ConversationSummary,
   Health,
   Message,
@@ -178,34 +177,31 @@ export class App implements OnInit {
     return PROVIDER_NAMES[health.provider ?? ''] ?? 'Model ready';
   }
 
-  // Save the pick and show the shopping list for that dish.
-  async chooseDish(message: Message, dish: Dish) {
-    if (this.loading()) return;
-    this.activeConversation.update((conversation) =>
-      conversation
-        ? {
-            ...conversation,
-            messages: conversation.messages.map((m) => (m.id === message.id ? { ...m, selectedDishId: dish.id } : m)),
-          }
-        : conversation,
-    );
-    // The card already has the recipe, so the shopping list is built from its ingredients
-    // right away, without asking the model again.
+  /** The message whose dish pick is turning into a shopping list. */
+  readonly choosingFor = signal<string | null>(null);
+
+  // Save the pick and show the shopping list for those dishes. The backend asks the recipe
+  // database what is missing, so this can take a few seconds.
+  async chooseDishes(message: Message, dishIds: string[]) {
+    if (this.loading() || this.choosingFor()) return;
+    this.choosingFor.set(message.id);
     try {
-      const saved = await firstValueFrom(this.chat.selectDish(message.id, dish.id));
+      const saved = await firstValueFrom(this.chat.selectDishes(message.id, dishIds));
       this.activeConversation.update((conversation) =>
         conversation
           ? {
               ...conversation,
               messages: conversation.messages.map((m) =>
-                m.id === message.id ? { ...m, selectedDishId: saved.selectedDishId, shoppingList: saved.shoppingList } : m,
+                m.id === message.id ? { ...m, selectedDishIds: saved.selectedDishIds, shoppingList: saved.shoppingList } : m,
               ),
             }
           : conversation,
       );
       this.scrollToBottom();
     } catch (error) {
-      this.showError(error, 'Could not build the shopping list for this dish.');
+      this.showError(error, 'Could not build the shopping list for these dishes.');
+    } finally {
+      this.choosingFor.set(null);
     }
   }
 

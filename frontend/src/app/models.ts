@@ -84,7 +84,7 @@ export interface Message {
   shoppingList?: ShoppingList | null;
   toolActivity?: ToolActivity[] | null;
   dishes?: Dish[] | null;
-  selectedDishId?: string | null;
+  selectedDishIds?: string[] | null;
   createdAt: string;
 }
 
@@ -125,9 +125,12 @@ export interface Dish {
   summary: string;
   servings?: number;
   minutes?: number;
-  ingredients: { name: string; quantity?: number; unit?: string }[];
+  ingredients: { name: string; quantity?: number; unit?: string; have?: boolean }[];
   steps?: string[];
   imageUrl: string | null;
+  /** Set for recipes from the recipe database. */
+  recipeId?: number;
+  missing?: string[];
 }
 
 export type StreamStatus = 'answering' | 'searching' | 'listing' | 'dishes' | 'using_tool';

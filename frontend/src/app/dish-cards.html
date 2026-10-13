@@ -1,10 +1,10 @@
-<div class="dish-grid" [class.decided]="selectedId()" role="list" aria-label="Dish ideas">
+<div class="dish-grid" [class.decided]="picked().size" role="list" aria-label="Dish ideas">
   @for (dish of dishes(); track dish.id; let index = $index) {
     <article
       class="dish-card"
       role="listitem"
-      [class.selected]="selectedId() === dish.id"
-      [class.dimmed]="selectedId() && selectedId() !== dish.id"
+      [class.selected]="picked().has(dish.id)"
+      [class.dimmed]="picked().size && !picked().has(dish.id)"
     >
       <div class="photo">
         @if (hasPhoto(dish)) {
@@ -19,7 +19,7 @@
           <div class="placeholder" [attr.data-variant]="index % 3" aria-hidden="true">🍲</div>
         }
         <span class="number">{{ index + 1 }}</span>
-        @if (selectedId() === dish.id) {
+        @if (picked().has(dish.id)) {
           <span class="chosen-badge">✓ Your pick</span>
         }
       </div>
@@ -37,9 +37,13 @@
         <h4>Ingredients</h4>
         <ul class="ingredients">
           @for (ingredient of dish.ingredients; track $index) {
-            <li>
+            <li [class.have]="ingredient.have">
               <span>{{ ingredient.name }}</span>
-              @if (amount(ingredient)) { <em>{{ amount(ingredient) }}</em> }
+              @if (amount(ingredient)) {
+                <em>{{ amount(ingredient) }}</em>
+              } @else if (dish.recipeId !== undefined) {
+                <em>{{ ingredient.have ? '✓ have' : 'to buy' }}</em>
+              }
             </li>
           }
         </ul>
@@ -59,11 +63,18 @@
       <button
         type="button"
         class="choose"
-        [disabled]="disabled() || selectedId() === dish.id"
-        (click)="chosen.emit(dish)"
+        [attr.aria-pressed]="picked().has(dish.id)"
+        [disabled]="disabled() || busy()"
+        (click)="toggle(dish.id)"
       >
-        {{ selectedId() === dish.id ? 'Chosen' : 'Make this' }}
+        {{ picked().has(dish.id) ? '✓ Picked' : 'Pick' }}
       </button>
     </article>
   }
+</div>
+
+<div class="dish-actions">
+  <button type="button" class="make" [disabled]="disabled() || busy() || saved() || !picked().size" (click)="submit()">
+    {{ submitLabel() }}
+  </button>
 </div>

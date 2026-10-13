@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import type { RecommendedRecipe } from "@/lib/recipe-service";
 
-// Dish suggestions shown as cards. The model proposes them with the suggestDishes tool;
-// the backend adds a photo for each and the user picks one to cook.
+// Dish suggestions shown as cards. The suggestDishes tool takes them from the recipe database;
+// the backend adds a photo for each and the user picks one or more to cook.
 export const MAX_DISHES = 4;
 const MAX_INGREDIENTS = 25;
 const MAX_STEPS = 12;
@@ -28,12 +29,37 @@ export const dishInputSchema = z.object({
   minutes: z.coerce.number().int().positive().max(1_440).optional().catch(undefined).describe("Total time"),
   ingredients: z.array(ingredientSchema).min(1).max(MAX_INGREDIENTS).describe("All ingredients with amounts"),
   steps: z.array(z.string().trim().min(1).max(300)).max(MAX_STEPS).optional().catch(undefined).describe("Short steps"),
+  // Set for recipes from the recipe database: its id, what the user has, and what to buy.
+  recipeId: z.number().int().optional().catch(undefined),
+  available: z.array(z.string().max(80)).max(60).optional().catch(undefined),
+  missing: z.array(z.string().max(80)).max(MAX_INGREDIENTS).optional().catch(undefined),
 });
 
 export type DishInput = z.infer<typeof dishInputSchema>;
 export type Dish = DishInput & { id: string; imageUrl: string | null };
 
 export type ImageFinder = (dishName: string, signal?: AbortSignal) => Promise<string | null>;
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Turns recipe database matches into dish cards. Ingredients the user has are marked `have`. */
+export function dishesFromRecipes(recipes: RecommendedRecipe[], available: string[]): DishInput[] {
+  return recipes.slice(0, MAX_DISHES).map((recipe) => {
+    const matched = new Set(recipe.matched);
+    const toBuy = recipe.missing.length === 0 ? "nothing to buy" : `${recipe.missing.length} to buy`;
+    return {
+      name: (recipe.recipe_name ?? `Recipe ${recipe.recipe_id}`).slice(0, 100),
+      summary: `Uses ${recipe.matched.length} of your ingredients, ${toBuy}.`,
+      ingredients: recipe.required.slice(0, MAX_INGREDIENTS).map((name) => ({
+        name: capitalize(name),
+        ...(matched.has(name) ? { have: true } : {}),
+      })),
+      recipeId: recipe.recipe_id,
+      available,
+      missing: recipe.missing,
+    };
+  });
+}
 
 /** Adds ids and photos. Photos are looked up in parallel; a failed lookup just means no photo. */
 export async function buildDishes(

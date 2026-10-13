@@ -117,10 +117,10 @@ export class ChatService {
     return this.http.post<ShoppingList>(`${this.baseUrl}/shopping-lists/${id}/decline`, {});
   }
 
-  selectDish(messageId: string, dishId: string) {
-    return this.http.post<{ id: string; selectedDishId: string; shoppingList: ShoppingList | null }>(
+  selectDishes(messageId: string, dishIds: string[]) {
+    return this.http.post<{ id: string; selectedDishIds: string[]; shoppingList: ShoppingList | null }>(
       `${this.baseUrl}/messages/${messageId}/dish`,
-      { dishId },
+      { dishIds },
     );
   }
 

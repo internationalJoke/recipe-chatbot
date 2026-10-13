@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildDishes, dishesFromToolOutput, dishInputSchema, dishShoppingItems, parseStoredDishes, type DishInput } from "@/lib/dishes";
+import { buildDishes, dishesFromRecipes, dishesFromToolOutput, dishInputSchema, dishShoppingItems, parseStoredDishes, type DishInput } from "@/lib/dishes";
 
 const dish = (name: string): DishInput =>
   dishInputSchema.parse({ name, summary: "Tasty.", servings: 4, minutes: 30, ingredients: [{ name: "potato", quantity: 500, unit: "g" }] });
@@ -73,5 +73,17 @@ describe("dishShoppingItems", () => {
       { name: "eggs", quantity: 5, unit: "pcs", searchTerm: "ägg" },
       { name: "salt", quantity: 1, unit: "pcs" },
     ]);
+  });
+});
+
+describe("dishesFromRecipes", () => {
+  it("marks owned ingredients and keeps the recipe id, available, and missing lists", () => {
+    const [card] = dishesFromRecipes(
+      [{ recipe_id: 9, recipe_name: "Omelette", coverage: 0.67, matched: ["egg", "onion"], missing: ["butter"], required: ["butter", "egg", "onion"] }],
+      ["egg", "onion"],
+    );
+    expect(card).toMatchObject({ name: "Omelette", recipeId: 9, available: ["egg", "onion"], missing: ["butter"] });
+    expect(card.summary).toBe("Uses 2 of your ingredients, 1 to buy.");
+    expect(card.ingredients).toEqual([{ name: "Butter" }, { name: "Egg", have: true }, { name: "Onion", have: true }]);
   });
 });
