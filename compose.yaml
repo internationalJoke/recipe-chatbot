@@ -43,6 +43,7 @@ services:
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       UPLOAD_DIR: /app/uploads
+      RECIPE_SERVICE_URL: http://recipe-service:8000
     volumes:
       - uploads_data:/app/uploads
     ports:
@@ -52,6 +53,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      recipe-service:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
@@ -60,6 +63,13 @@ services:
       - "4300:80"
     depends_on:
       - backend
+    restart: unless-stopped
+
+  recipe-service:
+    build:
+      context: ./recipe-service
+    ports:
+      - "8000:8000"
     restart: unless-stopped
 
 volumes:

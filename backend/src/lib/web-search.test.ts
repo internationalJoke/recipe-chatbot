@@ -63,8 +63,8 @@ describe("cleanResults", () => {
 
 describe("buildChatTools", () => {
   it("adds webSearch only when TAVILY_API_KEY is set", () => {
-    expect(Object.keys(buildChatTools({}))).toEqual(["suggestDishes", "proposeShoppingList"]);
-    expect(Object.keys(buildChatTools({ TAVILY_API_KEY: "tvly-k" }))).toEqual(["suggestDishes", "proposeShoppingList", "webSearch"]);
+    expect(Object.keys(buildChatTools({}))).toEqual(["suggestDishes", "proposeShoppingList", "recipeRecommendation", "recipeMissingIngredients"]);
+    expect(Object.keys(buildChatTools({ TAVILY_API_KEY: "tvly-k" }))).toEqual(["suggestDishes", "proposeShoppingList", "recipeRecommendation", "recipeMissingIngredients", "webSearch"]);
   });
 
   it("returns the error to the model instead of throwing", async () => {
