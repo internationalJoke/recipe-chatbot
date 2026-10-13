@@ -1,6 +1,7 @@
 from pathlib import Path
 import pandas as pd
 from ingredient_matcher import canonicalize
+from matching import make_matcher
 
 # =========================================================
 # Paths
@@ -146,24 +147,22 @@ def find_missing_ingredients(
     recipe_id,
     available
 ):
-    required = set(
-        get_recipe_ingredients(recipe_id)
-    )
+    requirements = recipe_requirements.get(recipe_id, {})
+    covered = matcher.covered(available)
 
     available_set = {
         canonicalize(x)
         for x in available
         if x
-    }
+    } - {None, ""}
 
-    available_set = {
-        x
-        for x in available_set
-        if x
+    required = set(requirements)
+    matched = {
+        name
+        for name, keys in requirements.items()
+        if keys & covered
     }
-
-    matched = required & available_set
-    missing = required - available_set
+    missing = required - matched
 
     coverage = (
         len(matched) / len(required)
@@ -235,6 +234,34 @@ recipe_ingredient_map = (
 )
 
 
+# 4. recipe_id -> {ingredient name shown: keys used for matching}
+#    The matcher decides the keys: the cleaned name, plus a taxonomy node.
+#    Rows the matcher marks as not an ingredient (None) are left out.
+matcher = make_matcher()
+
+recipe_requirements = {}
+
+for recipe_id, raw_name, canonical_name in zip(
+    valid_ingredients_df["recipe_id"],
+    valid_ingredients_df["name"],
+    valid_ingredients_df["canonical_name"],
+):
+    if not canonical_name:
+        continue
+
+    keys = matcher.required_keys(raw_name, canonical_name)
+
+    if keys is None:
+        continue
+
+    recipe_requirements.setdefault(recipe_id, {}).setdefault(
+        canonical_name,
+        keys
+    )
+
+print(f"Recipe matcher: {matcher.name}", flush=True)
+
+
 # =========================================================
 # Fast recipe lookup
 # =========================================================
@@ -279,11 +306,13 @@ def recommend_recipes(
     if not available_set:
         return []
 
+    covered = matcher.covered(available_ingredients)
+
     results = []
 
-    for recipe_id, required in recipe_ingredient_map.items():
+    for recipe_id, requirements in recipe_requirements.items():
 
-        required_set = set(required)
+        required_set = set(requirements)
 
         if not required_set:
             continue
@@ -291,8 +320,12 @@ def recommend_recipes(
         if len(required_set) < min_required_ingredients:
             continue
 
-        matched = required_set & available_set
-        missing = required_set - available_set
+        matched = {
+            name
+            for name, keys in requirements.items()
+            if keys & covered
+        }
+        missing = required_set - matched
 
         matched_count = len(matched)
         missing_count = len(missing)

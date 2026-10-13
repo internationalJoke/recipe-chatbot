@@ -9,3 +9,4 @@ frontend/dist/
 frontend/.angular/
 **/.idea/
 *.iml
+__pycache__/

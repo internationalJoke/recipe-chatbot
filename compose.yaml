@@ -68,6 +68,9 @@ services:
   recipe-service:
     build:
       context: ./recipe-service
+    environment:
+      # "ontology" links names to the Open Food Facts taxonomy; "exact" is the original matching.
+      RECIPE_MATCHER: ${RECIPE_MATCHER:-ontology}
     ports:
       - "8000:8000"
     # Loading the recipe CSVs takes a while; the backend waits until /health answers.
