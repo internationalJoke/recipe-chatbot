@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractShoppingList, parseStoredItems } from "@/lib/shopping-list";
+import { extractShoppingList, parseStoredItems, toShoppingItems } from "@/lib/shopping-list";
 
 let counter = 0;
 const makeId = () => `id-${++counter}`;
@@ -50,5 +50,15 @@ describe("extractShoppingList", () => {
 describe("parseStoredItems", () => {
   it("rejects malformed stored data", () => {
     expect(() => parseStoredItems([{ id: 1 }])).toThrow();
+  });
+});
+
+describe("toShoppingItems", () => {
+  it("validates tool input and drops repeated names", () => {
+    const items = toShoppingItems(
+      [{ name: "Garlic", quantity: 2, unit: "clove" }, { name: "garlic", quantity: 1, unit: "pcs" }, { nope: true }],
+      makeId,
+    );
+    expect(items).toEqual([expect.objectContaining({ name: "Garlic", quantity: 2, unit: "clove" })]);
   });
 });

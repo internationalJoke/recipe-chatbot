@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cleanResults, searchWeb, WebSearchError } from "@/lib/web-search";
+import { cleanResults, searchImage, searchWeb, WebSearchError } from "@/lib/web-search";
 import { buildChatTools } from "@/lib/tools";
 
 const jsonResponse = (body: unknown, status = 200) =>
@@ -63,8 +63,8 @@ describe("cleanResults", () => {
 
 describe("buildChatTools", () => {
   it("adds webSearch only when TAVILY_API_KEY is set", () => {
-    expect(Object.keys(buildChatTools({}))).toEqual([]);
-    expect(Object.keys(buildChatTools({ TAVILY_API_KEY: "tvly-k" }))).toEqual(["webSearch"]);
+    expect(Object.keys(buildChatTools({}))).toEqual(["suggestDishes", "proposeShoppingList"]);
+    expect(Object.keys(buildChatTools({ TAVILY_API_KEY: "tvly-k" }))).toEqual(["suggestDishes", "proposeShoppingList", "webSearch"]);
   });
 
   it("returns the error to the model instead of throwing", async () => {
@@ -76,5 +76,20 @@ describe("buildChatTools", () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+describe("searchImage", () => {
+  it("asks Tavily for images and prefers https image files", async () => {
+    const fetchFn = vi.fn(async () =>
+      jsonResponse({ images: ["http://insecure.com/a.jpg", { url: "https://site.com/page" }, "https://cdn.com/tortilla.jpg?w=600"] }),
+    );
+    expect(await searchImage("tortilla dish", { apiKey: "k", fetchFn })).toBe("https://cdn.com/tortilla.jpg?w=600");
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ query: "tortilla dish", include_images: true });
+  });
+
+  it("returns null when there are no images", async () => {
+    expect(await searchImage("x", { apiKey: "k", fetchFn: async () => jsonResponse({ results: [] }) })).toBeNull();
   });
 });

@@ -10,7 +10,10 @@ import {
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ChatService } from './chat.service';
-import { ShoppingList } from './models';
+import { Order, OrderLine, ShoppingItem, ShoppingList, StoreId } from './models';
+import { STORE_BRANDS } from './store-logos';
+
+const STORE_ORDER: StoreId[] = ['willys', 'hemkop'];
 
 @Component({
   selector: 'app-shopping-list-card',
@@ -24,21 +27,30 @@ export class ShoppingListCard {
   readonly list = input.required<ShoppingList>();
   readonly changed = output<ShoppingList>();
 
-  // Item ids the user unticked. Everything is selected by default.
-  private readonly excluded = signal<ReadonlySet<string>>(new Set());
+  // Item ids the user flipped. Items start ticked, except ones the user likely has already.
+  private readonly flipped = signal<ReadonlySet<string>>(new Set());
   readonly busy = signal(false);
   readonly error = signal('');
 
-  readonly selectedCount = computed(
-    () => this.list().items.filter((item) => !this.excluded().has(item.id)).length,
-  );
+  readonly selectedCount = computed(() => this.list().items.filter((item) => this.isSelected(item.id)).length);
+
+  /** Items the user already has are hidden; they can be shown to tick one back in. */
+  readonly showHave = signal(false);
+  readonly haveCount = computed(() => this.list().items.filter((item) => item.have).length);
+  readonly visibleItems = computed(() => {
+    const items = this.list().items;
+    if (this.list().status !== 'PROPOSED' || this.showHave()) return items;
+    // Keep an item visible if the user ticked it back in.
+    return items.filter((item) => !item.have || this.isSelected(item.id));
+  });
 
   isSelected(id: string) {
-    return !this.excluded().has(id);
+    const startsTicked = !this.list().items.find((item) => item.id === id)?.have;
+    return this.flipped().has(id) ? !startsTicked : startsTicked;
   }
 
   toggle(id: string) {
-    this.excluded.update((current) => {
+    this.flipped.update((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -58,8 +70,53 @@ export class ShoppingListCard {
     await this.run(() => firstValueFrom(this.chat.declineShoppingList(this.list().id)));
   }
 
+  /** Logos that failed to load; those stores show a text badge instead. */
+  readonly brokenLogos = signal<ReadonlySet<StoreId>>(new Set());
+
+  brand(store: StoreId) {
+    return STORE_BRANDS[store];
+  }
+
+  onLogoError(store: StoreId) {
+    this.brokenLogos.update((current) => new Set(current).add(store));
+  }
+
+  /** One list per store, always both stores side by side; a store may have nothing to buy. */
+  storeGroups(order: Order) {
+    return STORE_ORDER.map((store) => {
+      const lines: OrderLine[] = order.lines.filter((line) => line.store === store);
+      return { store, lines, totalCents: lines.reduce((sum, line) => sum + line.lineTotalCents, 0) };
+    });
+  }
+
+  pickedStore(order: Order, itemId: string): StoreId | undefined {
+    return order.lines.find((line) => line.itemId === itemId)?.store;
+  }
+
+  /** Swedish name from the store search word, e.g. "Vitlök"; English if there is none. */
+  swedish(item: ShoppingItem) {
+    const name = item.searchTerm?.trim() || item.name;
+    return name.charAt(0).toLocaleUpperCase('sv-SE') + name.slice(1);
+  }
+
+  /** Store sizes in Swedish style: "60g" → "60 g", "≈0.16 kg" → "≈0,16 kg", "10p" → "10 st". */
+  swedishSize(size: string) {
+    return size
+      .replace(/(\d)\.(\d)/g, '$1,$2')
+      .replace(/(\d)\s*(kg|hg|g|ml|cl|dl|l)\b/gi, '$1 $2')
+      .replace(/(\d)\s*-?p\b/gi, '$1 st');
+  }
+
+  /** e.g. "9 Oct 2026, 11:45" — prices change often, so the card says when they were fetched. */
+  when(iso: string) {
+    const date = new Date(iso);
+    const day = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return `${day}, ${time}`;
+  }
+
   money(cents: number, currency: string) {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100);
+    return new Intl.NumberFormat('sv-SE', { style: 'currency', currency }).format(cents / 100);
   }
 
   private async run(action: () => Promise<ShoppingList>) {
@@ -70,7 +127,7 @@ export class ShoppingListCard {
       this.changed.emit(await action());
     } catch (error) {
       const apiMessage = error instanceof HttpErrorResponse ? error.error?.error : undefined;
-      this.error.set(typeof apiMessage === 'string' ? apiMessage : 'Could not reach the market. Try again.');
+      this.error.set(typeof apiMessage === 'string' ? apiMessage : 'Could not check prices. Try again.');
     } finally {
       this.busy.set(false);
     }

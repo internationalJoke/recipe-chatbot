@@ -105,7 +105,7 @@
       }
 
       @for (message of activeConversation()?.messages ?? []; track message.id) {
-        <article class="message" [class.user-message]="message.role === 'USER'" [class.failed-message]="message.status === 'FAILED'">
+        <article class="message" [class.user-message]="message.role === 'USER'" [class.failed-message]="message.status === 'FAILED'" [class.has-dishes]="message.dishes?.length" [class.has-list]="message.shoppingList">
           <div class="avatar" [class.chef-avatar]="message.role !== 'USER'">
             @if (message.role === 'USER') { You } @else { <app-produce-logo /> }
           </div>
@@ -160,6 +160,15 @@
                   }
                 }
               </div>
+            }
+
+            @if (message.dishes?.length) {
+              <app-dish-cards
+                [dishes]="message.dishes!"
+                [selectedId]="message.selectedDishId"
+                [disabled]="loading()"
+                (chosen)="chooseDish(message, $event)"
+              />
             }
 
             @if (message.shoppingList; as list) {

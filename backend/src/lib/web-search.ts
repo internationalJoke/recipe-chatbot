@@ -55,10 +55,9 @@ export function cleanResults(raw: z.infer<typeof tavilyResponseSchema>["results"
     .slice(0, MAX_RESULTS);
 }
 
-export async function searchWeb(
-  query: string,
-  options: { apiKey?: string; signal?: AbortSignal; fetchFn?: typeof fetch } = {},
-): Promise<WebSearchResponse> {
+type TavilyOptions = { apiKey?: string; signal?: AbortSignal; fetchFn?: typeof fetch };
+
+async function callTavily(body: Record<string, unknown>, options: TavilyOptions): Promise<unknown> {
   const apiKey = options.apiKey ?? webSearchApiKey();
   if (!apiKey) throw new WebSearchError("Web search is not configured. Set TAVILY_API_KEY.");
 
@@ -71,12 +70,7 @@ export async function searchWeb(
     response = await fetchFn(TAVILY_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: query.trim().slice(0, MAX_QUERY),
-        max_results: MAX_RESULTS,
-        search_depth: "basic",
-        include_answer: "basic",
-      }),
+      body: JSON.stringify(body),
       signal,
     });
   } catch (error) {
@@ -85,10 +79,43 @@ export async function searchWeb(
   }
 
   if (!response.ok) throw new WebSearchError(messageForStatus(response.status));
+  return response.json().catch(() => null);
+}
 
-  const parsed = tavilyResponseSchema.safeParse(await response.json().catch(() => null));
+export async function searchWeb(query: string, options: TavilyOptions = {}): Promise<WebSearchResponse> {
+  const data = await callTavily(
+    { query: query.trim().slice(0, MAX_QUERY), max_results: MAX_RESULTS, search_depth: "basic", include_answer: "basic" },
+    options,
+  );
+  const parsed = tavilyResponseSchema.safeParse(data);
   if (!parsed.success) throw new WebSearchError("Web search returned an unexpected response.");
 
   const answer = parsed.data.answer?.trim();
   return { ...(answer ? { answer: answer.slice(0, MAX_SNIPPET) } : {}), results: cleanResults(parsed.data.results) };
+}
+
+// Tavily returns images as plain URLs or as { url, description }.
+const tavilyImagesSchema = z.object({
+  images: z.array(z.union([z.string(), z.object({ url: z.string() })])).catch([]),
+});
+
+const IMAGE_EXTENSION = /\.(jpe?g|png|webp|avif)(\?|$)/i;
+
+/** Returns the first usable https image URL for a query, or null. Never throws for "no image". */
+export async function searchImage(query: string, options: TavilyOptions = {}): Promise<string | null> {
+  const data = await callTavily(
+    { query: query.trim().slice(0, MAX_QUERY), max_results: 1, search_depth: "basic", include_images: true },
+    options,
+  );
+  const urls = tavilyImagesSchema.parse(data ?? {}).images.map((image) => (typeof image === "string" ? image : image.url));
+  const usable = urls.flatMap((raw) => {
+    try {
+      const url = new URL(raw);
+      return url.protocol === "https:" && url.href.length <= 2_048 ? [url.href] : [];
+    } catch {
+      return [];
+    }
+  });
+  // Prefer links that clearly point at an image file.
+  return usable.find((url) => IMAGE_EXTENSION.test(url)) ?? usable[0] ?? null;
 }

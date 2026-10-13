@@ -30,3 +30,42 @@ header small { color: #4f6a5b; font-size: 12px; }
 .missing { margin: 8px 0 0; color: #c4372d; font-size: 12px; }
 .total { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; font-size: 15px; }
 .total strong { color: #2e9e55; }
+
+/* Price comparison */
+.best { display: grid; gap: 2px; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; background: #e5f5e7; }
+.best-label { color: #22813f; font-size: 13px; font-weight: 800; }
+.best small { color: #4f6a5b; font-size: 12px; }
+
+/* Always two stores side by side; stack only on very narrow screens. */
+.store-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .store-lists { grid-template-columns: 1fr; } }
+.store-list { min-width: 0; border: 1px solid #e1ecdd; border-radius: 14px; overflow: hidden; background: #fff; }
+.store-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #e1ecdd; background: #fbfdfa; }
+.store-head strong { color: #1d3a2a; font-size: 15px; }
+.logo { display: inline-flex; align-items: center; gap: 8px; color: var(--brand); font-weight: 800; font-size: 15px; text-decoration: none; }
+.logo img { display: block; width: 110px; height: 22px; object-fit: contain; object-position: left center; }
+.store-list ul { margin: 0; padding: 4px 12px 8px; list-style: none; font-size: 13px; }
+.store-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #e1ecdd; }
+.store-list li:last-child { border-bottom: 0; }
+.store-list li a { overflow: hidden; color: #1d3a2a; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.store-list li a:hover { color: #22813f; text-decoration: underline; }
+.store-list li .size { color: #8ea597; }
+.store-list li .price { color: #1d3a2a; font-weight: 600; white-space: nowrap; }
+
+.price-details { margin-top: 12px; font-size: 13px; }
+.price-details summary { width: fit-content; color: #22813f; font-weight: 700; cursor: pointer; }
+.compare { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 13px; }
+.compare th, .compare td { padding: 6px 8px; border-bottom: 1px dashed #e1ecdd; text-align: right; }
+.compare th[scope="row"], .compare thead th:first-child { text-align: left; font-weight: 500; color: #1d3a2a; }
+.compare thead th { color: #8ea597; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.compare td a { color: #1d3a2a; text-decoration: none; }
+.compare td a:hover { text-decoration: underline; }
+.compare td.picked { background: #e5f5e7; font-weight: 700; }
+.compare td.picked a { color: #22813f; }
+.compare tfoot th, .compare tfoot td { border-bottom: 0; color: #8ea597; font-weight: 600; }
+.none { color: #a9b8ae; font-weight: 400; }
+.note { margin: 8px 0 0; color: #8ea597; font-size: 11px; }
+.show-have { margin-top: 6px; padding: 4px 2px; border: 0; color: #22813f; background: none; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.show-have:hover { text-decoration: underline; }
+.nothing { margin: 0; padding: 14px 12px; color: #8ea597; font-size: 13px; }
+.store-head strong.zero { color: #a9b8ae; font-weight: 600; }

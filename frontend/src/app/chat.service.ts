@@ -117,6 +117,13 @@ export class ChatService {
     return this.http.post<ShoppingList>(`${this.baseUrl}/shopping-lists/${id}/decline`, {});
   }
 
+  selectDish(messageId: string, dishId: string) {
+    return this.http.post<{ id: string; selectedDishId: string; shoppingList: ShoppingList | null }>(
+      `${this.baseUrl}/messages/${messageId}/dish`,
+      { dishId },
+    );
+  }
+
   // Health returns 503 when the model key is missing; we still want its body.
   async health(): Promise<Health | null> {
     try {

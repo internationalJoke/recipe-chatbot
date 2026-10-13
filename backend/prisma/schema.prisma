@@ -47,6 +47,9 @@ model Message {
   shoppingList   ShoppingList?
   // Tools used for this reply, e.g. web searches with their sources.
   toolActivity   Json?
+  // Dish cards suggested in this reply, and the one the user picked.
+  dishes         Json?
+  selectedDishId String?       @db.VarChar(64)
   createdAt      DateTime      @default(now())
 
   @@index([conversationId, createdAt])
@@ -86,5 +89,16 @@ model Order {
   missing        Json
   totalCents     Int
   currency       String       @db.VarChar(3)
+  // Willys vs Hemköp prices and the recommended plan.
+  comparison     Json?
   createdAt      DateTime     @default(now())
+}
+
+// Store logos, downloaded once from the store's site and served from here.
+model StoreLogo {
+  store     String   @id @db.VarChar(20)
+  mimeType  String   @db.VarChar(60)
+  data      Bytes
+  sourceUrl String   @db.Text
+  fetchedAt DateTime @default(now())
 }

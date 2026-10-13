@@ -19,7 +19,7 @@ const PROVIDERS = {
   openrouter: {
     keyVar: "OPENROUTER_API_KEY",
     modelVar: "OPENROUTER_MODEL",
-    defaultModel: "dots-studio/dots-3-note-preview:free",
+    defaultModel: "deepseek/deepseek-v4.1-flash",
   },
 } as const;
 

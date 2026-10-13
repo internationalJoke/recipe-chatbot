@@ -5,8 +5,7 @@
       <strong>Shopping list</strong>
       <small>
         @switch (list().status) {
-          @case ('PROPOSED') { Untick what you already have, then accept to buy. }
-          @case ('ACCEPTED') { Accepted — order placed. }
+          @case ('PROPOSED') { Untick what you already have, then compare prices at Willys and Hemköp. }
           @case ('DECLINED') { Declined — nothing was bought. }
         }
       </small>
@@ -14,27 +13,102 @@
   </header>
 
   @if (list().status === 'ACCEPTED' && list().order; as order) {
-    <div class="receipt">
-      <div class="receipt-store">{{ order.store }}</div>
-      <ul>
-        @for (line of order.lines; track line.itemId) {
-          <li>
-            <span>{{ line.packs }} × {{ line.product }} <em>({{ line.packSize }})</em></span>
-            <span>{{ money(line.lineTotalCents, order.currency) }}</span>
-          </li>
-        }
-      </ul>
-      @if (order.missing.length) {
-        <p class="missing">Not in stock: {{ order.missing.join(', ') }}</p>
-      }
-      <div class="total">
-        <span>Total</span>
-        <strong>{{ money(order.totalCents, order.currency) }}</strong>
+    @if (order.comparison; as cmp) {
+      <div class="best">
+        <span class="best-label">Cheapest plan · {{ money(cmp.recommendation.totalCents, cmp.currency) }}</span>
       </div>
-    </div>
+
+      <div class="store-lists">
+        @for (group of storeGroups(order); track group.store) {
+          <section class="store-list">
+            <header class="store-head">
+              <a class="logo" [href]="brand(group.store).homeUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="brand(group.store).name" [style.--brand]="brand(group.store).color">
+                @if (!brokenLogos().has(group.store)) {
+                  <img [src]="brand(group.store).logoUrl" [alt]="brand(group.store).name" (error)="onLogoError(group.store)" />
+                }
+                @if (!brand(group.store).wordmark || brokenLogos().has(group.store)) {
+                  <span>{{ brand(group.store).name }}</span>
+                }
+              </a>
+              <strong [class.zero]="!group.lines.length">{{ money(group.totalCents, order.currency) }}</strong>
+            </header>
+            @if (group.lines.length) {
+              <ul>
+                @for (line of group.lines; track line.itemId) {
+                  <li>
+                    <a class="name" [href]="line.url" target="_blank" rel="noopener noreferrer" [title]="line.product">
+                      {{ line.name ?? line.product }}@if (line.size) {<span class="size"> ({{ swedishSize(line.size) }})</span>}
+                    </a>
+                    <span class="price">{{ money(line.lineTotalCents, order.currency) }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="nothing">Nothing to buy here — the other store is cheaper for everything.</p>
+            }
+          </section>
+        }
+      </div>
+
+      @if (order.missing.length) {
+        <p class="missing">Not found at either store: {{ order.missing.join(', ') }}</p>
+      }
+
+      <details class="price-details">
+        <summary>Price details</summary>
+        <table class="compare">
+          <thead>
+            <tr>
+              <th scope="col">Item</th>
+              @for (s of cmp.stores; track s.store) {
+                <th scope="col">{{ s.name }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of cmp.items; track row.itemId) {
+              <tr>
+                <th scope="row">{{ row.name }}</th>
+                @for (s of cmp.stores; track s.store) {
+                  <td [class.picked]="pickedStore(order, row.itemId) === s.store">
+                    @if (row.offers[s.store]; as offer) {
+                      <a [href]="offer.url" target="_blank" rel="noopener noreferrer" [title]="offer.product + ' — ' + offer.amountLabel">
+                        {{ money(offer.costCents, cmp.currency) }}
+                      </a>
+                    } @else {
+                      <span class="none">—</span>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">All at one store</th>
+              @for (s of cmp.stores; track s.store) {
+                <td>
+                  {{ money(s.totalCents, cmp.currency) }}
+                  @if (s.missing.length) { <small class="none">({{ s.missing.length }} missing)</small> }
+                </td>
+              }
+            </tr>
+          </tfoot>
+        </table>
+        <p class="note">Prices from willys.se and hemkop.se on {{ when(cmp.comparedAt ?? order.createdAt) }}. Prices change often. Items sold by weight are estimates.</p>
+      </details>
+    } @else {
+      <div class="receipt">
+        <div class="receipt-store">{{ order.store }}</div>
+        <div class="total">
+          <span>Total</span>
+          <strong>{{ money(order.totalCents, order.currency) }}</strong>
+        </div>
+      </div>
+    }
   } @else {
     <ul class="items">
-      @for (item of list().items; track item.id) {
+      @for (item of visibleItems(); track item.id) {
         <li>
           <label [class.off]="!isSelected(item.id)">
             <input
@@ -43,7 +117,7 @@
               [disabled]="list().status !== 'PROPOSED' || busy()"
               (change)="toggle(item.id)"
             />
-            <span class="name">{{ item.name }}</span>
+            <span class="name">{{ swedish(item) }}</span>
             <span class="qty">{{ item.quantity }} {{ item.unit }}</span>
           </label>
           @if (item.note) {
@@ -52,6 +126,11 @@
         </li>
       }
     </ul>
+    @if (list().status === 'PROPOSED' && haveCount()) {
+      <button type="button" class="show-have" (click)="showHave.set(!showHave())">
+        {{ showHave() ? 'Hide items you already have' : 'Show ' + haveCount() + (haveCount() === 1 ? ' item' : ' items') + ' you already have' }}
+      </button>
+    }
   }
 
   @if (error()) {
@@ -62,7 +141,7 @@
     <div class="actions">
       <button type="button" class="decline" (click)="decline()" [disabled]="busy()">Decline</button>
       <button type="button" class="accept" (click)="accept()" [disabled]="busy() || selectedCount() === 0">
-        {{ busy() ? 'Buying…' : 'Accept & buy ' + selectedCount() + ' item' + (selectedCount() === 1 ? '' : 's') }}
+        {{ busy() ? 'Checking Willys & Hemköp…' : 'Compare prices for ' + selectedCount() + ' item' + (selectedCount() === 1 ? '' : 's') }}
       </button>
     </div>
   }

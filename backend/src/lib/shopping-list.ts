@@ -12,6 +12,8 @@ const rawItemSchema = z.object({
   quantity: z.coerce.number().positive().max(10_000).catch(1),
   unit: z.string().trim().max(20).catch("pcs").default("pcs"),
   note: z.string().trim().max(160).optional().catch(undefined),
+  searchTerm: z.string().trim().min(1).max(80).optional().catch(undefined),
+  have: z.boolean().optional().catch(undefined),
 });
 
 const rawListSchema = z.object({ items: z.array(z.unknown()).max(MAX_ITEMS * 2) });
@@ -22,6 +24,10 @@ export type ShoppingItem = {
   quantity: number;
   unit: string;
   note?: string;
+  /** Swedish word to search for at Willys/Hemköp, e.g. "gul lök". */
+  searchTerm?: string;
+  /** The user likely has it already, so the card starts with it unticked. */
+  have?: boolean;
 };
 
 export type ExtractResult = {
@@ -53,12 +59,23 @@ function parseItems(body: string, makeId: () => string): ShoppingItem[] {
   }
 
   const list = rawListSchema.safeParse(Array.isArray(parsed) ? { items: parsed } : parsed);
-  if (!list.success) return [];
+  return list.success ? toShoppingItems(list.data.items, makeId) : [];
+}
 
-  return list.data.items
+/**
+ * Validates raw items from the model (tool input or text block) into stored items.
+ * Drops invalid entries and repeats by name, so a list proposed twice is not doubled.
+ */
+export function toShoppingItems(raw: unknown[], makeId: () => string = randomUUID): ShoppingItem[] {
+  const seen = new Set<string>();
+  return raw
     .flatMap((item) => {
       const result = rawItemSchema.safeParse(item);
-      return result.success ? [result.data] : [];
+      if (!result.success) return [];
+      const key = result.data.name.toLowerCase();
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [result.data];
     })
     .slice(0, MAX_ITEMS)
     .map((item) => ({
@@ -67,6 +84,8 @@ function parseItems(body: string, makeId: () => string): ShoppingItem[] {
       quantity: item.quantity,
       unit: item.unit || "pcs",
       ...(item.note ? { note: item.note } : {}),
+      ...(item.searchTerm ? { searchTerm: item.searchTerm } : {}),
+      ...(item.have ? { have: true } : {}),
     }));
 }
 
@@ -76,6 +95,8 @@ const storedItemSchema = z.object({
   quantity: z.number(),
   unit: z.string(),
   note: z.string().optional(),
+  searchTerm: z.string().optional(),
+  have: z.boolean().optional(),
 });
 
 export function parseStoredItems(value: unknown): ShoppingItem[] {

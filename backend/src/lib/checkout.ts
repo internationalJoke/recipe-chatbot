@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { quoteOrder } from "@/lib/market";
 import { parseStoredItems } from "@/lib/shopping-list";
+import { StoreUnavailableError } from "@/lib/stores/axfood";
+import { comparePrices } from "@/lib/stores/compare";
 
 export class CheckoutError extends Error {
   constructor(message: string, readonly status: number) {
@@ -11,35 +12,44 @@ export class CheckoutError extends Error {
 const withOrder = { order: true } as const;
 
 /**
- * The only place that "buys" groceries. Runs only after the user clicks Accept.
- * The status check inside the transaction stops a double click from ordering twice.
+ * Runs only after the user clicks Accept. Compares Willys and Hemköp for the ticked items and
+ * saves the cheapest plan. Nothing is bought online: the user finishes at the store's site.
+ * Prices are fetched before the claim, so a store outage leaves the list open to try again.
  */
 export async function acceptShoppingList(listId: string, itemIds: string[]) {
+  const list = await prisma.shoppingList.findUnique({ where: { id: listId } });
+  if (!list) throw new CheckoutError("Shopping list not found", 404);
+  if (list.status !== "PROPOSED") throw new CheckoutError(`This list was already ${list.status.toLowerCase()}`, 409);
+
+  const wanted = new Set(itemIds);
+  const chosen = parseStoredItems(list.items).filter((item) => wanted.has(item.id));
+  if (chosen.length === 0) throw new CheckoutError("Pick at least one item to buy", 400);
+
+  let comparison;
+  try {
+    comparison = await comparePrices(chosen);
+  } catch (error) {
+    if (error instanceof StoreUnavailableError) throw new CheckoutError(error.message, 502);
+    throw error;
+  }
+
   return prisma.$transaction(async (tx) => {
-    const list = await tx.shoppingList.findUnique({ where: { id: listId } });
-    if (!list) throw new CheckoutError("Shopping list not found", 404);
-    if (list.status !== "PROPOSED") throw new CheckoutError(`This list was already ${list.status.toLowerCase()}`, 409);
-
-    const items = parseStoredItems(list.items);
-    const wanted = new Set(itemIds);
-    const chosen = items.filter((item) => wanted.has(item.id));
-    if (chosen.length === 0) throw new CheckoutError("Pick at least one item to buy", 400);
-
+    // The status check stops a double click from saving two plans.
     const claimed = await tx.shoppingList.updateMany({
       where: { id: listId, status: "PROPOSED" },
       data: { status: "ACCEPTED" },
     });
     if (claimed.count !== 1) throw new CheckoutError("This list was already handled", 409);
 
-    const quote = quoteOrder(chosen);
     await tx.order.create({
       data: {
         shoppingListId: listId,
-        store: quote.store,
-        currency: quote.currency,
-        lines: quote.lines,
-        missing: quote.missing,
-        totalCents: quote.totalCents,
+        store: comparison.recommendation.label,
+        currency: comparison.currency,
+        lines: comparison.lines,
+        missing: comparison.missing,
+        totalCents: comparison.recommendation.totalCents,
+        comparison,
       },
     });
     return tx.shoppingList.findUniqueOrThrow({ where: { id: listId }, include: withOrder });

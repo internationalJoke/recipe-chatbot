@@ -12,7 +12,7 @@ vi.mock("@/lib/files", () => ({
   readUpload: async (path: string) => Buffer.from(path.endsWith(".txt") ? "2 eggs, flour" : "PIXELS"),
 }));
 
-const { buildModelMessages, friendlyError, streamChat, TextOnlyModelError } = await import("@/lib/llm");
+const { buildModelMessages, friendlyError, listIsRelevant, looksLikeRecipe, streamChat, TextOnlyModelError } = await import("@/lib/llm");
 
 type Row = Message & { attachments: Attachment[] };
 let seq = 0;
@@ -20,7 +20,7 @@ const attachment = (originalName: string, mimeType: string): Attachment => ({
   id: `a${++seq}`, messageId: "m", originalName, mimeType, fileSize: 1, storagePath: originalName, createdAt: new Date(),
 });
 const row = (role: Row["role"], content: string, attachments: Attachment[] = []): Row => ({
-  id: `m${++seq}`, conversationId: "c", role, content, status: "COMPLETE", model: null, toolActivity: null, attachments, createdAt: new Date(),
+  id: `m${++seq}`, conversationId: "c", role, content, status: "COMPLETE", model: null, toolActivity: null, dishes: null, selectedDishId: null, attachments, createdAt: new Date(),
 });
 
 const usage = {
@@ -81,7 +81,7 @@ describe("streamChat", () => {
     const reply = await streamChat([row("USER", "hi")], (chunk) => chunks.push(chunk));
 
     expect(chunks).toEqual(["Hello ", "chef"]);
-    expect(reply).toEqual({ content: "Hello chef", model: "gemini-3.8-flash", toolActivity: [] });
+    expect(reply).toEqual({ content: "Hello chef", model: "gemini-3.8-flash", shoppingItems: [], dishes: [], toolActivity: [] });
     const call = mockModel.current.doStreamCalls[0];
     expect(call.prompt[0]).toMatchObject({ role: "system" });
   });
@@ -194,6 +194,135 @@ describe("streamChat", () => {
     expect(calls).toBe(1);
   });
 
+  it("collects items from proposeShoppingList and keeps it out of the tool chips", async () => {
+    const stream = (parts: unknown[]) => ({ stream: convertArrayToReadableStream(parts as never[]) });
+    const items = [{ name: "olive oil", quantity: 1, unit: "l", note: "for cooking" }];
+    mockModel.current = new MockLanguageModelV4({
+      doStream: [
+        stream([
+          { type: "text-start", id: "t" },
+          { type: "text-delta", id: "t", delta: "Make a pasta." },
+          { type: "text-end", id: "t" },
+          { type: "tool-call", toolCallId: "s1", toolName: "proposeShoppingList", input: JSON.stringify({ items }) },
+          { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_calls" }, usage },
+        ]),
+        stream([{ type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage }]),
+      ],
+    });
+    const statuses: string[] = [];
+    const reply = await streamChat([row("USER", "What pasta can I make tonight?")], () => {}, undefined, (name) => statuses.push(name));
+    expect(reply.content).toBe("Make a pasta.");
+    expect(reply.shoppingItems).toEqual(items);
+    expect(reply.toolActivity).toEqual([]);
+    expect(statuses).toEqual(["proposeShoppingList"]);
+  });
+
+  it("retries without tools when the model's host does not support them", async () => {
+    let calls = 0;
+    mockModel.current = new MockLanguageModelV4({
+      doStream: async (options) => {
+        calls += 1;
+        if (options.tools?.length) {
+          throw new APICallError({
+            message: "Not Found", url: "u", requestBodyValues: {}, statusCode: 404,
+            data: { error: { message: "No endpoints found that support tool use" } },
+          });
+        }
+        return streamingModel("Plain answer.").doStream({} as never);
+      },
+    });
+    await expect(streamChat([row("USER", "hi")], () => {})).resolves.toMatchObject({ content: "Plain answer." });
+    expect(calls).toBe(2);
+  });
+
+  it("forces a shopping list when a recipe answer forgot it", async () => {
+    const recipe = "Roast the potatoes and carrots with onion. Chop everything, then roast for 30 minutes. ".repeat(3);
+    const items = [{ name: "olive oil", quantity: 1, unit: "l" }];
+    const model = streamingModel(recipe);
+    model.doGenerate = async (options) => {
+      expect(options.toolChoice).toEqual({ type: "required" });
+      return {
+        content: [{ type: "tool-call", toolCallId: "f1", toolName: "proposeShoppingList", input: JSON.stringify({ items }) }],
+        finishReason: { unified: "tool-calls", raw: "tool_calls" },
+        usage,
+        warnings: [],
+      } as never;
+    };
+    mockModel.current = model;
+    const statuses: string[] = [];
+    const reply = await streamChat([row("USER", "dinner?")], () => {}, undefined, (name) => statuses.push(name));
+    expect(reply.shoppingItems).toEqual(items);
+    expect(statuses).toEqual(["proposeShoppingList"]);
+  });
+
+  it("skips the forced list for answers that are not recipes", async () => {
+    const model = streamingModel("The current US president is someone. ".repeat(10));
+    let generated = 0;
+    model.doGenerate = async () => {
+      generated += 1;
+      throw new Error("should not be called");
+    };
+    mockModel.current = model;
+    const reply = await streamChat([row("USER", "who is president?")], () => {});
+    expect(reply.shoppingItems).toEqual([]);
+    expect(generated).toBe(0);
+  });
+
+  it("keeps the answer when the forced list call fails", async () => {
+    const model = streamingModel("Fry the onions, then simmer with tomatoes and serve with rice. ".repeat(4));
+    model.doGenerate = async () => {
+      throw new APICallError({ message: "down", url: "u", requestBodyValues: {}, statusCode: 502 });
+    };
+    mockModel.current = model;
+    const reply = await streamChat([row("USER", "dinner?")], () => {});
+    expect(reply.content).toContain("Fry the onions");
+    expect(reply.shoppingItems).toEqual([]);
+  });
+
+  it("drops a list the model attached to small talk", async () => {
+    const stream = (parts: unknown[]) => ({ stream: convertArrayToReadableStream(parts as never[]) });
+    mockModel.current = new MockLanguageModelV4({
+      doStream: [
+        stream([
+          { type: "text-start", id: "t" },
+          { type: "text-delta", id: "t", delta: "I'm your home-cooking assistant." },
+          { type: "text-end", id: "t" },
+          { type: "tool-call", toolCallId: "s1", toolName: "proposeShoppingList", input: JSON.stringify({ items: [{ name: "eggs", quantity: 6, unit: "pcs" }] }) },
+          { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_calls" }, usage },
+        ]),
+        stream([{ type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage }]),
+      ],
+    });
+    const reply = await streamChat([row("USER", "who are you")], () => {});
+    expect(reply.shoppingItems).toEqual([]);
+  });
+
+  it("returns dish cards and holds back the shopping list until a dish is picked", async () => {
+    const stream = (parts: unknown[]) => ({ stream: convertArrayToReadableStream(parts as never[]) });
+    const dishes = [{ name: "Tortilla", summary: "Eggs and potatoes.", ingredients: [{ name: "eggs", quantity: 5, unit: "pcs" }] }];
+    mockModel.current = new MockLanguageModelV4({
+      doStream: [
+        stream([
+          { type: "tool-call", toolCallId: "d1", toolName: "suggestDishes", input: JSON.stringify({ dishes }) },
+          { type: "tool-call", toolCallId: "s1", toolName: "proposeShoppingList", input: JSON.stringify({ items: [{ name: "eggs", quantity: 5, unit: "pcs" }] }) },
+          { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_calls" }, usage },
+        ]),
+        stream([
+          { type: "text-start", id: "t" },
+          { type: "text-delta", id: "t", delta: "Which one would you like to make?" },
+          { type: "text-end", id: "t" },
+          { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage },
+        ]),
+      ],
+    });
+    const statuses: string[] = [];
+    const reply = await streamChat([row("USER", "what can I cook with potatoes?")], () => {}, undefined, (name) => statuses.push(name));
+    expect(reply.dishes).toEqual([expect.objectContaining({ name: "Tortilla", imageUrl: null, id: expect.any(String) })]);
+    expect(reply.shoppingItems).toEqual([]);
+    expect(reply.toolActivity).toEqual([]);
+    expect(statuses).toContain("suggestDishes");
+  });
+
   it("rejects an empty answer", async () => {
     mockModel.current = streamingModel();
     await expect(streamChat([row("USER", "hi")], () => {})).rejects.toThrow(/empty answer/);
@@ -240,5 +369,33 @@ describe("friendlyError", () => {
       "This model supports text only. Please send a text message without images.",
     );
     expect(friendlyError(withData("model xyz does not exist"))).toBe("Model provider error: model xyz does not exist");
+  });
+});
+
+describe("buildSystemPrompt", () => {
+  it("includes today's date and the always-search rule", async () => {
+    const { buildSystemPrompt } = await import("@/lib/prompts");
+    const prompt = buildSystemPrompt(new Date("2026-10-08T12:00:00Z"));
+    expect(prompt).toContain("Current date: 2026-10-08");
+    expect(prompt).toMatch(/ALWAYS search/);
+  });
+});
+
+describe("looksLikeRecipe", () => {
+  it("needs two different cooking words in a long answer", () => {
+    expect(looksLikeRecipe("Chop the onions, then roast them for 30 minutes. ".repeat(5))).toBe(true);
+    expect(looksLikeRecipe("The president serves a four-year term and will serve until 2029. ".repeat(5))).toBe(false);
+    expect(looksLikeRecipe("Roast. Chop.")).toBe(false);
+  });
+});
+
+describe("listIsRelevant", () => {
+  const recipe = "Chop the onions, then roast them with potatoes for 30 minutes. ".repeat(5);
+  it("keeps a list for food suggestions or when the user asked for one", () => {
+    expect(listIsRelevant("what can I cook tonight?", recipe)).toBe(true);
+    expect(listIsRelevant("shopping list for lasagna please", "Here you go.")).toBe(true);
+  });
+  it("drops a list for small talk", () => {
+    expect(listIsRelevant("who are you", "I'm your home-cooking assistant. Shall we pick a dish?")).toBe(false);
   });
 });

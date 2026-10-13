@@ -3,8 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { streamChat, TextOnlyModelError } from "@/lib/llm";
 import { describeLlm } from "@/lib/llm-config";
 import { MAX_FILES, removeUpload, saveUpload, validateUpload } from "@/lib/files";
-import { extractShoppingList } from "@/lib/shopping-list";
+import { extractShoppingList, toShoppingItems } from "@/lib/shopping-list";
 import { queryOf } from "@/lib/tool-activity";
+import { PROPOSE_SHOPPING_LIST, SUGGEST_DISHES } from "@/lib/tools";
+
+const STATUS_BY_TOOL: Record<string, string> = {
+  webSearch: "searching",
+  [PROPOSE_SHOPPING_LIST]: "listing",
+  [SUGGEST_DISHES]: "dishes",
+};
 
 export const runtime = "nodejs";
 
@@ -147,22 +154,28 @@ function replyStream(
               send({ type: "chunk", content: chunk });
             },
             operationAbort.signal,
-            (toolName, input) =>
+            (toolName, input) => {
               send({
                 type: "status",
-                status: toolName === "webSearch" ? "searching" : "using_tool",
+                status: STATUS_BY_TOOL[toolName] ?? "using_tool",
                 ...(queryOf(input) ? { query: queryOf(input) } : {}),
-              }),
+              });
+            },
           );
 
-          const { text, items } = extractShoppingList(reply.content);
+          // Prefer the list from the proposeShoppingList tool; fall back to a <shopping_list> text block.
+          const extracted = extractShoppingList(reply.content);
+          const toolItems = toShoppingItems(reply.shoppingItems);
+          const text = extracted.text;
+          const items = toolItems.length > 0 ? toolItems : extracted.items;
           const assistantMessage = await prisma.message.update({
             where: { id: replyId },
             data: {
-              content: text || "Here is the shopping list for this recipe.",
+              content: text || (reply.dishes.length > 0 ? "Which dish would you like to make?" : "Here is the shopping list for this recipe."),
               model: reply.model,
               status: "COMPLETE",
               ...(reply.toolActivity.length > 0 ? { toolActivity: reply.toolActivity } : {}),
+              ...(reply.dishes.length > 0 ? { dishes: reply.dishes } : {}),
               ...(items ? { shoppingList: { create: { items } } } : {}),
             },
             include: { attachments: true, shoppingList: { include: { order: true } } },

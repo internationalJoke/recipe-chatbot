@@ -16,11 +16,14 @@ import { ChatService, ChatStreamError } from './chat.service';
 import {
   Attachment,
   Conversation,
+  Dish,
   ConversationSummary,
   Health,
   Message,
   ShoppingList,
+  StreamStatus,
 } from './models';
+import { DishCards } from './dish-cards';
 import { FridgeCartoon } from './fridge-cartoon';
 import { ProduceLogo } from './produce-logo';
 import { ShoppingListCard } from './shopping-list-card';
@@ -30,6 +33,13 @@ const LIST_TAG = '<shopping_list>';
 const STOP_RELOAD_DELAY_MS = 800;
 const SIDEBAR_KEY = 'recipe-box.sidebar-collapsed';
 const PROVIDER_NAMES: Record<string, string> = { gemini: 'Gemini', openrouter: 'OpenRouter' };
+
+function statusLabel(status: StreamStatus, query?: string) {
+  if (status === 'searching') return query ? `🔍 Searching the web for “${query}”…` : '🔍 Searching the web…';
+  if (status === 'listing') return '🛒 Preparing your shopping list…';
+  if (status === 'dishes') return '🍽️ Finding photos of your dishes…';
+  return 'Checking something…';
+}
 
 // While streaming, models send stray blank lines and the start of the hidden shopping-list tag.
 // Trim them the same way the server does on save, so the bubble doesn't jump when it finishes.
@@ -52,7 +62,7 @@ function readCollapsed() {
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon, ProduceLogo],
+  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon, ProduceLogo, DishCards],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.css',
@@ -166,6 +176,37 @@ export class App implements OnInit {
     if (!health) return 'Model offline';
     if (health.llm !== 'ok') return 'Model not configured';
     return PROVIDER_NAMES[health.provider ?? ''] ?? 'Model ready';
+  }
+
+  // Save the pick and show the shopping list for that dish.
+  async chooseDish(message: Message, dish: Dish) {
+    if (this.loading()) return;
+    this.activeConversation.update((conversation) =>
+      conversation
+        ? {
+            ...conversation,
+            messages: conversation.messages.map((m) => (m.id === message.id ? { ...m, selectedDishId: dish.id } : m)),
+          }
+        : conversation,
+    );
+    // The card already has the recipe, so the shopping list is built from its ingredients
+    // right away, without asking the model again.
+    try {
+      const saved = await firstValueFrom(this.chat.selectDish(message.id, dish.id));
+      this.activeConversation.update((conversation) =>
+        conversation
+          ? {
+              ...conversation,
+              messages: conversation.messages.map((m) =>
+                m.id === message.id ? { ...m, selectedDishId: saved.selectedDishId, shoppingList: saved.shoppingList } : m,
+              ),
+            }
+          : conversation,
+      );
+      this.scrollToBottom();
+    } catch (error) {
+      this.showError(error, 'Could not build the shopping list for this dish.');
+    }
   }
 
   onListChanged(messageId: string, list: ShoppingList) {
@@ -292,13 +333,7 @@ export class App implements OnInit {
         (status, query) => {
           if (status === 'answering') return;
           // Show the status bubble again, even if some text already streamed in.
-          this.thinkingStatus.set(
-            status === 'searching'
-              ? query
-                ? `🔍 Searching the web for “${query}”…`
-                : '🔍 Searching the web…'
-              : 'Checking something…',
-          );
+          this.thinkingStatus.set(statusLabel(status, query));
           this.streaming.set(false);
         },
       );

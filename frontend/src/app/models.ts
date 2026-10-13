@@ -17,16 +17,42 @@ export interface ShoppingItem {
   quantity: number;
   unit: string;
   note?: string;
+  searchTerm?: string;
+  /** The user likely has it already, so it starts unticked. */
+  have?: boolean;
 }
+
+export type StoreId = 'willys' | 'hemkop';
 
 export interface OrderLine {
   itemId: string;
+  /** Ingredient name and size; missing on plans saved before they existed. */
+  name?: string;
+  size?: string;
   requested: string;
+  store: StoreId;
+  storeName: string;
   product: string;
-  packSize: string;
-  packs: number;
-  unitPriceCents: number;
+  amountLabel: string;
   lineTotalCents: number;
+  url: string;
+}
+
+export interface StoreOffer {
+  product: string;
+  amountLabel: string;
+  costCents: number;
+  url: string;
+}
+
+export interface PriceComparison {
+  currency: string;
+  /** Missing on comparisons saved before dates were recorded. */
+  comparedAt?: string;
+  items: { itemId: string; name: string; offers: Partial<Record<StoreId, StoreOffer>> }[];
+  stores: { store: StoreId; name: string; totalCents: number; missing: string[] }[];
+  mix: { totalCents: number; missing: string[]; storesUsed: StoreId[] };
+  recommendation: { plan: StoreId | 'mix'; label: string; totalCents: number; reason: string };
 }
 
 export interface Order {
@@ -36,6 +62,7 @@ export interface Order {
   missing: string[];
   totalCents: number;
   currency: string;
+  comparison?: PriceComparison | null;
   createdAt: string;
 }
 
@@ -56,6 +83,8 @@ export interface Message {
   attachments: Attachment[];
   shoppingList?: ShoppingList | null;
   toolActivity?: ToolActivity[] | null;
+  dishes?: Dish[] | null;
+  selectedDishId?: string | null;
   createdAt: string;
 }
 
@@ -90,7 +119,18 @@ export interface ToolActivity {
   error?: string;
 }
 
-export type StreamStatus = 'answering' | 'searching' | 'using_tool';
+export interface Dish {
+  id: string;
+  name: string;
+  summary: string;
+  servings?: number;
+  minutes?: number;
+  ingredients: { name: string; quantity?: number; unit?: string }[];
+  steps?: string[];
+  imageUrl: string | null;
+}
+
+export type StreamStatus = 'answering' | 'searching' | 'listing' | 'dishes' | 'using_tool';
 
 export type SendMessageStreamEvent =
   | { type: 'status'; status: StreamStatus; query?: string }
