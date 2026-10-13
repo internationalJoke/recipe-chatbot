@@ -77,3 +77,4 @@ header small { color: #4f6a5b; font-size: 12px; }
 .your-list .row.off .name, .your-list .row.off .qty, .your-list .row.off .mark { color: #a9b8ae; }
 .your-list .row.off .name, .your-list .row.off .qty { text-decoration: line-through; }
 .your-list .note { display: block; margin: 2px 0 0 27px; }
+.name .sv { color: #8ea597; font-size: 12px; font-weight: 400; text-decoration: none; }

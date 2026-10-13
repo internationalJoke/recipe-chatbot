@@ -22,7 +22,7 @@
           <li>
             <span class="row" [class.off]="!acceptedIds(order).has(item.id)">
               <span class="mark" aria-hidden="true">{{ acceptedIds(order).has(item.id) ? '✓' : '–' }}</span>
-              <span class="name">{{ displayName(item) }}</span>
+              <span class="name">{{ displayName(item) }}@if (item.searchTerm) {<span class="sv"> ({{ item.searchTerm }})</span>}</span>
               <span class="qty">{{ item.quantity }} {{ item.unit }}</span>
             </span>
             @if (item.note) {
@@ -140,7 +140,7 @@
               [disabled]="list().status !== 'PROPOSED' || busy()"
               (change)="toggle(item.id)"
             />
-            <span class="name">{{ displayName(item) }}</span>
+            <span class="name">{{ displayName(item) }}@if (item.searchTerm) {<span class="sv"> ({{ item.searchTerm }})</span>}</span>
             <span class="qty">{{ item.quantity }} {{ item.unit }}</span>
           </label>
           @if (item.note) {
