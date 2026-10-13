@@ -1,0 +1,11 @@
+:host { display: block; margin-top: 12px; }
+.tabs { display: flex; gap: 6px; padding: 4px; border-radius: 14px; background: #eef6eb; overflow-x: auto; scrollbar-width: none; }
+.tabs button { flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border: 0; border-radius: 10px; color: #4f6a5b; background: transparent; font: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.tabs button:hover:not(:disabled) { color: #22813f; }
+.tabs button[aria-selected="true"] { color: #1d3a2a; background: #fff; box-shadow: 0 2px 8px rgba(46,110,70,.12); }
+.tabs button:disabled { color: #a9b8ae; cursor: default; }
+.num { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #a9b8ae; font-size: 12px; }
+.tabs button[aria-selected="true"] .num { background: #2e9e55; }
+.panel { touch-action: pan-y; animation: slide-in .2s ease; }
+@keyframes slide-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .panel { animation: none; } }

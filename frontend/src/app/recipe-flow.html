@@ -1,0 +1,35 @@
+<div class="tabs" role="tablist" aria-label="Recipe steps" (keydown)="onKey($event)">
+  <button type="button" role="tab" [attr.aria-selected]="active() === 'recipes'" [attr.tabindex]="active() === 'recipes' ? 0 : -1" (click)="open('recipes')">
+    <span class="num">1</span> Recipes
+  </button>
+  <button type="button" role="tab" [attr.aria-selected]="active() === 'list'" [attr.tabindex]="active() === 'list' ? 0 : -1" [disabled]="!enabled('list')" (click)="open('list')">
+    <span class="num">2</span> {{ listLabel() }}
+  </button>
+  <button type="button" role="tab" [attr.aria-selected]="active() === 'prices'" [attr.tabindex]="active() === 'prices' ? 0 : -1" [disabled]="!enabled('prices')" (click)="open('prices')">
+    <span class="num">3</span> {{ pricesLabel() }}
+  </button>
+</div>
+
+<div class="panel" role="tabpanel" (pointerdown)="onPointerDown($event)" (pointerup)="onPointerUp($event)" (pointercancel)="onPointerUp($event)">
+  @switch (active()) {
+    @case ('recipes') {
+      <app-dish-cards
+        [dishes]="message().dishes ?? []"
+        [selectedIds]="message().selectedDishIds"
+        [disabled]="disabled()"
+        [busy]="busy()"
+        (chosen)="chosen.emit($event)"
+      />
+    }
+    @case ('list') {
+      @if (message().shoppingList; as list) {
+        <app-shopping-list-card view="list" [list]="list" (changed)="listChanged.emit($event)" />
+      }
+    }
+    @case ('prices') {
+      @if (message().shoppingList; as list) {
+        <app-shopping-list-card view="prices" [list]="list" (changed)="listChanged.emit($event)" />
+      }
+    }
+  }
+</div>

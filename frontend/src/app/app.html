@@ -163,16 +163,14 @@
             }
 
             @if (message.dishes?.length) {
-              <app-dish-cards
-                [dishes]="message.dishes!"
-                [selectedIds]="message.selectedDishIds"
+              <app-recipe-flow
+                [message]="message"
                 [disabled]="loading()"
                 [busy]="choosingFor() === message.id"
                 (chosen)="chooseDishes(message, $event)"
+                (listChanged)="onListChanged(message.id, $event)"
               />
-            }
-
-            @if (message.shoppingList; as list) {
+            } @else if (message.shoppingList; as list) {
               <app-shopping-list-card [list]="list" (changed)="onListChanged(message.id, $event)" />
             }
           </div>

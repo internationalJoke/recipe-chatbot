@@ -25,6 +25,8 @@ export class ShoppingListCard {
   private readonly chat = inject(ChatService);
 
   readonly list = input.required<ShoppingList>();
+  /** 'list' shows only the items, 'prices' only the comparison; 'all' shows whichever fits the status. */
+  readonly view = input<'all' | 'list' | 'prices'>('all');
   readonly changed = output<ShoppingList>();
 
   // Item ids the user flipped. Items start ticked, except ones the user likely has already.

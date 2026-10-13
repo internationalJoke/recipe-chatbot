@@ -22,7 +22,7 @@ import {
   ShoppingList,
   StreamStatus,
 } from './models';
-import { DishCards } from './dish-cards';
+import { RecipeFlow } from './recipe-flow';
 import { FridgeCartoon } from './fridge-cartoon';
 import { ProduceLogo } from './produce-logo';
 import { ShoppingListCard } from './shopping-list-card';
@@ -61,7 +61,7 @@ function readCollapsed() {
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon, ProduceLogo, DishCards],
+  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon, ProduceLogo, RecipeFlow],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.css',

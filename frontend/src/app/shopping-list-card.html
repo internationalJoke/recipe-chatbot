@@ -7,12 +7,14 @@
         @switch (list().status) {
           @case ('PROPOSED') { Untick what you already have, then compare prices at Willys and Hemköp. }
           @case ('DECLINED') { Declined — nothing was bought. }
+          @case ('ACCEPTED') { @if (view() === 'list') { Prices compared — see the Prices tab. } }
         }
       </small>
     </div>
   </header>
 
   @if (list().status === 'ACCEPTED' && list().order; as order) {
+    @if (view() !== 'prices') {
     <details class="your-list" open>
       <summary>Your list · {{ acceptedIds(order).size }} of {{ list().items.length }} items compared</summary>
       <ul class="items">
@@ -30,7 +32,9 @@
         }
       </ul>
     </details>
+    }
 
+    @if (view() !== 'list') {
     @if (order.comparison; as cmp) {
       <div class="best">
         <span class="best-label">Cheapest plan · {{ money(cmp.recommendation.totalCents, cmp.currency) }}</span>
@@ -123,6 +127,7 @@
           <strong>{{ money(order.totalCents, order.currency) }}</strong>
         </div>
       </div>
+    }
     }
   } @else {
     <ul class="items">

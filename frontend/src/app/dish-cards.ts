@@ -50,7 +50,7 @@ export class DishCards {
   submitLabel() {
     const count = this.picked().size;
     if (this.busy()) return 'Building your shopping list…';
-    if (this.saved()) return 'Shopping list ready below';
+    if (this.saved()) return 'Shopping list ready';
     if (count === 0) return 'Pick one or more dishes';
     return count === 1 ? 'Make this dish' : `Make these ${count} dishes`;
   }
