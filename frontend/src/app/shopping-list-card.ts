@@ -101,10 +101,9 @@ export class ShoppingListCard {
     return order.lines.find((line) => line.itemId === itemId)?.store;
   }
 
-  /** Swedish name from the store search word, e.g. "Vitlök"; English if there is none. */
-  swedish(item: ShoppingItem) {
-    const name = item.searchTerm?.trim() || item.name;
-    return name.charAt(0).toLocaleUpperCase('sv-SE') + name.slice(1);
+  /** English name, e.g. "Garlic". The Swedish search word is only used to find store products. */
+  displayName(item: ShoppingItem) {
+    return item.name.charAt(0).toUpperCase() + item.name.slice(1);
   }
 
   /** Store sizes in Swedish style: "60g" → "60 g", "≈0.16 kg" → "≈0,16 kg", "10p" → "10 st". */

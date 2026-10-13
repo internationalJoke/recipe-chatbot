@@ -51,10 +51,9 @@ async function inBatches<T, R>(inputs: T[], size: number, run: (input: T) => Pro
 
 const termFor = (item: ShoppingItem) => item.searchTerm?.trim() || item.name;
 
-/** The Swedish name shown on the card, e.g. "Vitlök"; falls back to the English name. */
-function swedishName(item: ShoppingItem) {
-  const name = termFor(item);
-  return name.charAt(0).toLocaleUpperCase("sv-SE") + name.slice(1);
+/** The name shown on the card, in English, e.g. "Garlic". The Swedish word is only for searching. */
+function displayName(item: ShoppingItem) {
+  return item.name.charAt(0).toUpperCase() + item.name.slice(1);
 }
 
 function requested(item: ShoppingItem) {
@@ -64,7 +63,7 @@ function requested(item: ShoppingItem) {
 function line(item: ShoppingItem, store: StoreId, offer: Offer): PlanLine {
   return {
     itemId: item.id,
-    name: swedishName(item),
+    name: displayName(item),
     size: offer.size,
     requested: requested(item),
     store,
@@ -141,7 +140,7 @@ export async function comparePrices(
   return {
     currency: "SEK",
     comparedAt: (options.now ?? (() => new Date()))().toISOString(),
-    items: items.map((item) => ({ itemId: item.id, name: swedishName(item), offers: offersByItem.get(item.id) ?? {} })),
+    items: items.map((item) => ({ itemId: item.id, name: displayName(item), offers: offersByItem.get(item.id) ?? {} })),
     stores,
     mix: { totalCents: mixTotal, missing: mixMissing, storesUsed },
     recommendation,

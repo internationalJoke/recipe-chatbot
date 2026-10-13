@@ -45,6 +45,16 @@ describe("mergeDetails", () => {
 });
 
 describe("shoppingItemsForDishes", () => {
+  it("passes what the user has to the model and keeps its have marks", async () => {
+    const writer = vi.fn(async (names: string[]) =>
+      names.map((name) => ({ name, quantity: 1, unit: "pcs", ...(name === "miso" ? { have: true } : {}) })),
+    );
+    const items = await shoppingItemsForDishes([dish(1)], writer, lookup);
+    expect(writer).toHaveBeenCalledWith(["butter", "miso"], ["Dish 1"], ["egg", "onion"]);
+    expect(items.find((i) => i.name === "miso")?.have).toBe(true);
+    expect(items.find((i) => i.name === "butter")?.have).toBeUndefined();
+  });
+
   it("still returns the list when the model fails", async () => {
     const failing = vi.fn(async () => {
       throw new Error("rate limit");

@@ -106,13 +106,13 @@ describe("comparePrices", () => {
     expect(result.missing).toEqual(["saffron"]);
   });
 
-  it("names items in Swedish and records when prices were fetched", async () => {
+  it("names items in English, searches in Swedish, and records when prices were fetched", async () => {
     const result = await comparePrices([{ id: "g", name: "garlic", quantity: 1, unit: "pcs", searchTerm: "vitlök" }], {
       search: prices({ "vitlök": { willys: 9 } }),
       now: () => new Date("2026-10-09T09:45:00Z"),
     });
-    expect(result.lines[0].name).toBe("Vitlök");
-    expect(result.items[0].name).toBe("Vitlök");
+    expect(result.lines[0].name).toBe("Garlic");
+    expect(result.items[0].name).toBe("Garlic");
     expect(result.comparedAt).toBe("2026-10-09T09:45:00.000Z");
   });
 

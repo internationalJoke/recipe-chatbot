@@ -48,6 +48,10 @@ export const proposeShoppingListTool = tool({
             .string()
             .max(80)
             .describe('Swedish supermarket search word for Willys/Hemköp, e.g. "gul lök", "olivolja", "körsbärstomater"'),
+          have: z
+            .boolean()
+            .optional()
+            .describe("true if the user already has it, or has something that works instead (fresh tomatoes for peeled tomatoes)"),
         }),
       )
       .max(40)
