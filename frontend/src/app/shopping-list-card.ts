@@ -89,6 +89,12 @@ export class ShoppingListCard {
     });
   }
 
+  /** Items the user kept ticked when comparing prices; the rest were unticked. */
+  acceptedIds(order: Order): ReadonlySet<string> {
+    const ids = order.comparison?.items.map((row) => row.itemId) ?? order.lines.map((line) => line.itemId);
+    return new Set(ids);
+  }
+
   pickedStore(order: Order, itemId: string): StoreId | undefined {
     return order.lines.find((line) => line.itemId === itemId)?.store;
   }
