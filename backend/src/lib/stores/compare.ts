@@ -1,5 +1,7 @@
 import type { ShoppingItem } from "@/lib/shopping-list";
 import { searchStore, searchUrl, STORE_IDS, STORES, StoreUnavailableError, type StoreId, type StoreProduct } from "@/lib/stores/axfood";
+import type { Branch } from "@/lib/stores/branches";
+import type { LocalStores } from "@/lib/stores/local";
 import { bestOffer, type Offer } from "@/lib/stores/pricing";
 
 // Compares a shopping list at Willys and Hemköp and recommends the cheapest way to buy it.
@@ -21,7 +23,15 @@ export type PlanLine = {
   url: string;
 };
 
-export type StoreSummary = { store: StoreId; name: string; totalCents: number; missing: string[]; searchUrl: string };
+export type StoreSummary = {
+  store: StoreId;
+  name: string;
+  totalCents: number;
+  missing: string[];
+  searchUrl: string;
+  /** The store near the user whose prices were used; null means the site's default store. */
+  branch: Branch | null;
+};
 
 export type Comparison = {
   currency: "SEK";
@@ -37,9 +47,9 @@ export type Comparison = {
 
 const MAX_PARALLEL = 6;
 
-type Search = (store: StoreId, term: string, signal?: AbortSignal) => Promise<StoreProduct[]>;
+type Search = (store: StoreId, term: string, signal?: AbortSignal, branch?: { id: string; cookie: string }) => Promise<StoreProduct[]>;
 
-const defaultSearch: Search = (store, term, signal) => searchStore(store, term, { signal });
+const defaultSearch: Search = (store, term, signal, branch) => searchStore(store, term, { signal, branch });
 
 async function inBatches<T, R>(inputs: T[], size: number, run: (input: T) => Promise<R>): Promise<R[]> {
   const results: R[] = [];
@@ -77,15 +87,18 @@ function line(item: ShoppingItem, store: StoreId, offer: Offer): PlanLine {
 
 export async function comparePrices(
   items: ShoppingItem[],
-  options: { search?: Search; signal?: AbortSignal; now?: () => Date } = {},
+  options: { search?: Search; signal?: AbortSignal; now?: () => Date; local?: LocalStores } = {},
 ): Promise<Comparison> {
   const search = options.search ?? defaultSearch;
+  const local = options.local ?? {};
   const jobs = items.flatMap((item) => STORE_IDS.map((store) => ({ item, store })));
   let failures = 0;
 
   const found = await inBatches(jobs, MAX_PARALLEL, async ({ item, store }) => {
     try {
-      return { item, store, offer: bestOffer(item, await search(store, termFor(item), options.signal)) };
+      const near = local[store];
+      const branch = near ? { id: near.branch.id, cookie: near.cookie } : undefined;
+      return { item, store, offer: bestOffer(item, await search(store, termFor(item), options.signal, branch)) };
     } catch (error) {
       if (options.signal?.aborted) throw error;
       failures += 1;
@@ -110,6 +123,7 @@ export async function comparePrices(
     totalCents: items.reduce((sum, item) => sum + (offersByItem.get(item.id)?.[store]?.costCents ?? 0), 0),
     missing: items.filter((item) => !offersByItem.get(item.id)?.[store]).map((item) => item.name),
     searchUrl: searchUrl(store, ""),
+    branch: local[store]?.branch ?? null,
   }));
 
   // Mix: for each item, the cheapest store that has it.

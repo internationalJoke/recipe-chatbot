@@ -116,6 +116,19 @@ describe("comparePrices", () => {
     expect(result.comparedAt).toBe("2026-10-09T09:45:00.000Z");
   });
 
+  it("prices at the nearby store when one was found, and says which", async () => {
+    const seen: (string | undefined)[] = [];
+    const search = async (store: StoreId, term: string, _signal?: AbortSignal, branch?: { id: string }) => {
+      seen.push(`${store}:${branch?.id}`);
+      return prices({ [term]: { willys: 10, hemkop: 12 } })(store, term);
+    };
+    const branch = { id: "4003", name: "Hemköp Uppsala", town: "Uppsala", distanceKm: 1.2 };
+    const result = await comparePrices([item("milk", 1, "pcs")], { search, local: { hemkop: { branch, cookie: "c=1" } } });
+    expect(seen.sort()).toEqual(["hemkop:4003", "willys:undefined"]);
+    expect(result.stores.find((s) => s.store === "hemkop")?.branch).toEqual(branch);
+    expect(result.stores.find((s) => s.store === "willys")?.branch).toBeNull();
+  });
+
   it("fails only when every store search fails", async () => {
     const down = async () => {
       throw new Error("offline");

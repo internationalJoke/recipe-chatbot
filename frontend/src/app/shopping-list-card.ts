@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ChatService } from './chat.service';
+import { currentLocation } from './location';
 import { Order, OrderLine, ShoppingItem, ShoppingList, StoreId } from './models';
 import { STORE_BRANDS } from './store-logos';
 
@@ -32,6 +33,8 @@ export class ShoppingListCard {
   // Item ids the user flipped. Items start ticked, except ones the user likely has already.
   private readonly flipped = signal<ReadonlySet<string>>(new Set());
   readonly busy = signal(false);
+  /** Waiting for the browser's location before prices are checked. */
+  readonly locating = signal(false);
   readonly error = signal('');
 
   readonly selectedCount = computed(() => this.list().items.filter((item) => this.isSelected(item.id)).length);
@@ -65,7 +68,11 @@ export class ShoppingListCard {
       .items.filter((item) => this.isSelected(item.id))
       .map((item) => item.id);
     if (itemIds.length === 0) return;
-    await this.run(() => firstValueFrom(this.chat.acceptShoppingList(this.list().id, itemIds)));
+    await this.run(async () => {
+      this.locating.set(true);
+      const location = await currentLocation().finally(() => this.locating.set(false));
+      return firstValueFrom(this.chat.acceptShoppingList(this.list().id, itemIds, location));
+    });
   }
 
   async decline() {
@@ -95,6 +102,19 @@ export class ShoppingListCard {
   acceptedIds(order: Order): ReadonlySet<string> {
     const ids = order.comparison?.items.map((row) => row.itemId) ?? order.lines.map((line) => line.itemId);
     return new Set(ids);
+  }
+
+  /** "Hemköp Malmö Triangeln · 1.1 km" when prices came from a store near the user. */
+  branchLabel(order: Order, store: StoreId) {
+    const branch = order.comparison?.stores.find((s) => s.store === store)?.branch;
+    if (!branch) return null;
+    const km = branch.distanceKm < 10 ? branch.distanceKm.toFixed(1) : Math.round(branch.distanceKm).toString();
+    return `${branch.name} · ${km.replace('.', ',')} km`;
+  }
+
+  /** True when at least one store's prices are from a store near the user. */
+  usedNearby(order: Order) {
+    return Boolean(order.comparison?.stores.some((s) => s.branch));
   }
 
   pickedStore(order: Order, itemId: string): StoreId | undefined {

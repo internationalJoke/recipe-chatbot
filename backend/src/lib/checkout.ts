@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { parseStoredItems } from "@/lib/shopping-list";
 import { StoreUnavailableError } from "@/lib/stores/axfood";
+import type { Location } from "@/lib/stores/branches";
 import { comparePrices } from "@/lib/stores/compare";
+import { findLocalStores } from "@/lib/stores/local";
 
 export class CheckoutError extends Error {
   constructor(message: string, readonly status: number) {
@@ -13,10 +15,11 @@ const withOrder = { order: true } as const;
 
 /**
  * Runs only after the user clicks Accept. Compares Willys and Hemköp for the ticked items and
- * saves the cheapest plan. Nothing is bought online: the user finishes at the store's site.
+ * saves the cheapest plan. With the user's location, prices come from the nearest stores; the
+ * location itself is not saved, only which stores were used. Nothing is bought online: the user finishes at the store's site.
  * Prices are fetched before the claim, so a store outage leaves the list open to try again.
  */
-export async function acceptShoppingList(listId: string, itemIds: string[]) {
+export async function acceptShoppingList(listId: string, itemIds: string[], location?: Location) {
   const list = await prisma.shoppingList.findUnique({ where: { id: listId } });
   if (!list) throw new CheckoutError("Shopping list not found", 404);
   if (list.status !== "PROPOSED") throw new CheckoutError(`This list was already ${list.status.toLowerCase()}`, 409);
@@ -27,7 +30,8 @@ export async function acceptShoppingList(listId: string, itemIds: string[]) {
 
   let comparison;
   try {
-    comparison = await comparePrices(chosen);
+    const local = location ? await findLocalStores(location) : {};
+    comparison = await comparePrices(chosen, { local });
   } catch (error) {
     if (error instanceof StoreUnavailableError) throw new CheckoutError(error.message, 502);
     throw error;
