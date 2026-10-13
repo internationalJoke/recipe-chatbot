@@ -2,11 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearBranchCache, distanceKm, nearestBranches, parseBranches } from "@/lib/stores/branches";
 import { clearSessionCache, mergeCookies, storeSessionCookie } from "@/lib/stores/session";
 
-const site = (storeId: string, name: string, latitude: number, longitude: number, town = "Town") => ({
+const site = (storeId: string, name: string, latitude: number, longitude: number, onlineStore = true) => ({
   storeId,
   name,
   geoPoint: { latitude, longitude },
-  address: { town },
+  address: { town: "Town" },
+  onlineStore,
 });
 
 const UPPSALA = { lat: 59.8586, lon: 17.6389 };
@@ -32,8 +33,18 @@ describe("branches", () => {
     const nearest = await nearestBranches("willys", UPPSALA, 2, { fetchFn });
     expect(nearest.map((b) => b.id)).toEqual(["near", "mid"]);
     expect(nearest[0].distanceKm).toBeLessThan(2);
+    expect(nearest[0].closerWithoutPrices).toBe(false);
     await nearestBranches("willys", UPPSALA, 2, { fetchFn });
     expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("stores without online prices", () => {
+  it("are skipped, and the card can say a closer store had none", async () => {
+    const list = [site("shop", "Hemköp Älvsjö", 59.85, 17.65, false), site("web", "Hemköp Skanstull", 59.36, 18.0)];
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify(list)));
+    const [nearest] = await nearestBranches("hemkop", UPPSALA, 3, { fetchFn });
+    expect(nearest).toMatchObject({ id: "web", closerWithoutPrices: true });
   });
 });
 

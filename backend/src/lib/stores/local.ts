@@ -10,12 +10,12 @@ export type LocalStores = Partial<Record<StoreId, LocalStore>>;
 
 const CANDIDATES = 3;
 
+/** Tries the nearest stores at the same time and keeps the closest one that worked. */
 async function nearestUsable(store: StoreId, location: Location): Promise<LocalStore | null> {
-  for (const branch of await nearestBranches(store, location, CANDIDATES)) {
-    const cookie = await storeSessionCookie(store, branch.id);
-    if (cookie) return { branch, cookie };
-  }
-  return null;
+  const branches = await nearestBranches(store, location, CANDIDATES);
+  const cookies = await Promise.all(branches.map((branch) => storeSessionCookie(store, branch.id).catch(() => null)));
+  const index = cookies.findIndex(Boolean);
+  return index === -1 ? null : { branch: branches[index], cookie: cookies[index]! };
 }
 
 /** Nearest usable store per chain. A chain that fails falls back to its default prices. */

@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   output,
@@ -10,7 +11,7 @@ import {
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ChatService } from './chat.service';
-import { currentLocation } from './location';
+import { currentLocation, prefetchLocation } from './location';
 import { Order, OrderLine, ShoppingItem, ShoppingList, StoreId } from './models';
 import { STORE_BRANDS } from './store-logos';
 
@@ -32,6 +33,13 @@ export class ShoppingListCard {
 
   // Item ids the user flipped. Items start ticked, except ones the user likely has already.
   private readonly flipped = signal<ReadonlySet<string>>(new Set());
+
+  constructor() {
+    // A list waiting for Compare: get the location ready if the user already allowed it.
+    effect(() => {
+      if (this.list().status === 'PROPOSED') void prefetchLocation();
+    });
+  }
   readonly busy = signal(false);
   /** Waiting for the browser's location before prices are checked. */
   readonly locating = signal(false);
@@ -104,12 +112,24 @@ export class ShoppingListCard {
     return new Set(ids);
   }
 
-  /** "Hemköp Malmö Triangeln · 1.1 km" when prices came from a store near the user. */
-  branchLabel(order: Order, store: StoreId) {
+  /**
+   * The store near the user whose prices were used: place ("Stockholm Skarpnäck", the logo
+   * already says the chain), distance, and a map link. Only stores with an online shop have
+   * prices, so `skipped` says when a closer one had to be passed over.
+   */
+  branchInfo(order: Order, store: StoreId) {
     const branch = order.comparison?.stores.find((s) => s.store === store)?.branch;
     if (!branch) return null;
-    const km = branch.distanceKm < 10 ? branch.distanceKm.toFixed(1) : Math.round(branch.distanceKm).toString();
-    return `${branch.name} · ${km.replace('.', ',')} km`;
+    const chain = STORE_BRANDS[store].name;
+    const place = branch.name.startsWith(chain) ? branch.name.slice(chain.length).trim() || branch.name : branch.name;
+    const km = branch.distanceKm < 10 ? branch.distanceKm.toFixed(1).replace('.', ',') : Math.round(branch.distanceKm).toString();
+    return {
+      name: branch.name,
+      place,
+      km: `${km} km`,
+      skipped: Boolean(branch.closerWithoutPrices),
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(branch.name)}`,
+    };
   }
 
   /** True when at least one store's prices are from a store near the user. */

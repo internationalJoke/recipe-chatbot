@@ -78,4 +78,11 @@ header small { color: #4f6a5b; font-size: 12px; }
 .your-list .row.off .name, .your-list .row.off .qty { text-decoration: line-through; }
 .your-list .note { display: block; margin: 2px 0 0 27px; }
 .name .sv { color: #8ea597; font-size: 12px; font-weight: 400; text-decoration: none; }
-.branch { margin: 0; padding: 6px 12px; border-bottom: 1px solid #e1ecdd; color: #4f6a5b; font-size: 12px; background: #fbfdfa; }
+.branch { display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 6px; row-gap: 2px; padding: 8px 12px; border-bottom: 1px solid #e1ecdd; background: #fbfdfa; }
+.branch .pin { font-size: 13px; }
+.branch .place { min-width: 0; overflow: hidden; color: #1d3a2a; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.branch a.place:hover { color: #22813f; text-decoration: underline; }
+.branch .km { padding: 2px 8px; border-radius: 999px; color: #b8650a; background: #fff1dc; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.branch .hint { grid-column: 2 / -1; color: #8ea597; font-size: 11px; }
+.branch .muted { color: #8ea597; font-weight: 600; }
+.branch .km.muted { background: #f1f4f0; }

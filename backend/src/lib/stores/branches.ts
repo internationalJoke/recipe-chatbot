@@ -3,11 +3,19 @@ import { STORES, type StoreId } from "@/lib/stores/axfood";
 
 // Physical stores of each chain, and the ones closest to the user.
 // Willys has the same prices everywhere; Hemköp stores (many are franchises) set their own.
+// Only stores with an online shop have prices on the website, so only those can be compared.
 
 export type Location = { lat: number; lon: number };
-export type Branch = { id: string; name: string; town: string | null; distanceKm: number };
+export type Branch = {
+  id: string;
+  name: string;
+  town: string | null;
+  distanceKm: number;
+  /** A closer store of this chain exists but has no online prices. */
+  closerWithoutPrices: boolean;
+};
 
-type BranchSite = { id: string; name: string; town: string | null; lat: number; lon: number };
+type BranchSite = { id: string; name: string; town: string | null; lat: number; lon: number; online: boolean };
 
 const LIST_TIMEOUT_MS = 12_000;
 const LIST_TTL_MS = 24 * 60 * 60 * 1000;
@@ -18,6 +26,7 @@ const branchSchema = z.object({
   name: z.string().min(1),
   geoPoint: z.object({ latitude: z.number(), longitude: z.number() }),
   address: z.object({ town: z.string().nullish() }).nullish(),
+  onlineStore: z.boolean().nullish().catch(null),
 });
 
 const lists = new Map<StoreId, { at: number; sites: BranchSite[] }>();
@@ -35,8 +44,10 @@ export function parseBranches(data: unknown): BranchSite[] {
   return data.flatMap((raw) => {
     const parsed = branchSchema.safeParse(raw);
     if (!parsed.success) return [];
-    const { storeId, name, geoPoint, address } = parsed.data;
-    return [{ id: storeId, name: name.trim(), town: address?.town ?? null, lat: geoPoint.latitude, lon: geoPoint.longitude }];
+    const { storeId, name, geoPoint, address, onlineStore } = parsed.data;
+    const site = { id: storeId, name: name.trim(), town: address?.town ?? null, lat: geoPoint.latitude, lon: geoPoint.longitude };
+    // A missing flag counts as online, so a change on the site does not hide every store.
+    return [{ ...site, online: onlineStore !== false }];
   });
 }
 
@@ -53,7 +64,7 @@ async function listBranches(store: StoreId, fetchFn: typeof fetch, now: number):
   return sites;
 }
 
-/** The chain's stores nearest to the user, closest first. */
+/** The chain's stores with online prices nearest to the user, closest first. */
 export async function nearestBranches(
   store: StoreId,
   location: Location,
@@ -61,10 +72,20 @@ export async function nearestBranches(
   options: { fetchFn?: typeof fetch; now?: () => number } = {},
 ): Promise<Branch[]> {
   const sites = await listBranches(store, options.fetchFn ?? fetch, (options.now ?? Date.now)());
-  return sites
-    .map((site) => ({ id: site.id, name: site.name, town: site.town, distanceKm: distanceKm(location, site) }))
-    .sort((a, b) => a.distanceKm - b.distanceKm)
-    .slice(0, count);
+  const sorted = sites
+    .map((site) => ({ site, distanceKm: distanceKm(location, site) }))
+    .sort((a, b) => a.distanceKm - b.distanceKm);
+  const closestAny = sorted[0]?.distanceKm ?? 0;
+  return sorted
+    .filter(({ site }) => site.online)
+    .slice(0, count)
+    .map(({ site, distanceKm }) => ({
+      id: site.id,
+      name: site.name,
+      town: site.town,
+      distanceKm,
+      closerWithoutPrices: distanceKm > closestAny,
+    }));
 }
 
 export function clearBranchCache() {

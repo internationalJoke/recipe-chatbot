@@ -122,7 +122,7 @@ describe("comparePrices", () => {
       seen.push(`${store}:${branch?.id}`);
       return prices({ [term]: { willys: 10, hemkop: 12 } })(store, term);
     };
-    const branch = { id: "4003", name: "Hemköp Uppsala", town: "Uppsala", distanceKm: 1.2 };
+    const branch = { id: "4003", name: "Hemköp Uppsala", town: "Uppsala", distanceKm: 1.2, closerWithoutPrices: false };
     const result = await comparePrices([item("milk", 1, "pcs")], { search, local: { hemkop: { branch, cookie: "c=1" } } });
     expect(seen.sort()).toEqual(["hemkop:4003", "willys:undefined"]);
     expect(result.stores.find((s) => s.store === "hemkop")?.branch).toEqual(branch);

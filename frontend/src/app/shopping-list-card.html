@@ -54,9 +54,20 @@
               </a>
               <strong [class.zero]="!group.lines.length">{{ money(group.totalCents, order.currency) }}</strong>
             </header>
-            <p class="branch">
-              @if (branchLabel(order, group.store); as label) { 📍 {{ label }} } @else { Online prices (default store) }
-            </p>
+            <div class="branch">
+              @if (branchInfo(order, group.store); as b) {
+                <span class="pin" aria-hidden="true">📍</span>
+                <a class="place" [href]="b.mapsUrl" target="_blank" rel="noopener noreferrer" [title]="'Show ' + b.name + ' on a map'">{{ b.place }}</a>
+                <span class="km">{{ b.km }}</span>
+                @if (b.skipped) {
+                  <small class="hint">Closer {{ brand(group.store).name }} stores don't sell online</small>
+                }
+              } @else {
+                <span class="pin" aria-hidden="true">🌐</span>
+                <span class="place muted">Online prices</span>
+                <span class="km muted">no location</span>
+              }
+            </div>
             @if (group.lines.length) {
               <ul>
                 @for (line of group.lines; track line.itemId) {

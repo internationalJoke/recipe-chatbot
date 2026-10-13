@@ -56,7 +56,7 @@ export interface PriceComparison {
     totalCents: number;
     missing: string[];
     /** The nearby store whose prices were used; null or missing means the site's default store. */
-    branch?: { id: string; name: string; town: string | null; distanceKm: number } | null;
+    branch?: { id: string; name: string; town: string | null; distanceKm: number; closerWithoutPrices?: boolean } | null;
   }[];
   mix: { totalCents: number; missing: string[]; storesUsed: StoreId[] };
   recommendation: { plan: StoreId | 'mix'; label: string; totalCents: number; reason: string };
