@@ -109,8 +109,11 @@ export class ChatService {
     return completed;
   }
 
-  acceptShoppingList(id: string, itemIds: string[]) {
-    return this.http.post<ShoppingList>(`${this.baseUrl}/shopping-lists/${id}/accept`, { itemIds });
+  acceptShoppingList(id: string, itemIds: string[], location?: { lat: number; lon: number } | null) {
+    return this.http.post<ShoppingList>(`${this.baseUrl}/shopping-lists/${id}/accept`, {
+      itemIds,
+      ...(location ? { location } : {}),
+    });
   }
 
   declineShoppingList(id: string) {

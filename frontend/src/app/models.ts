@@ -50,7 +50,14 @@ export interface PriceComparison {
   /** Missing on comparisons saved before dates were recorded. */
   comparedAt?: string;
   items: { itemId: string; name: string; offers: Partial<Record<StoreId, StoreOffer>> }[];
-  stores: { store: StoreId; name: string; totalCents: number; missing: string[] }[];
+  stores: {
+    store: StoreId;
+    name: string;
+    totalCents: number;
+    missing: string[];
+    /** The nearby store whose prices were used; null or missing means the site's default store. */
+    branch?: { id: string; name: string; town: string | null; distanceKm: number } | null;
+  }[];
   mix: { totalCents: number; missing: string[]; storesUsed: StoreId[] };
   recommendation: { plan: StoreId | 'mix'; label: string; totalCents: number; reason: string };
 }

@@ -8,6 +8,8 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 const acceptSchema = z.object({
   itemIds: z.array(z.string().min(1).max(64)).min(1).max(40),
+  // Optional: the browser's location, to price at the nearest stores. Not stored.
+  location: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).optional(),
 });
 
 export async function POST(request: Request, { params }: RouteContext) {
@@ -18,7 +20,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   }
 
   try {
-    return NextResponse.json(await acceptShoppingList(id, parsed.data.itemIds));
+    return NextResponse.json(await acceptShoppingList(id, parsed.data.itemIds, parsed.data.location));
   } catch (error) {
     if (error instanceof CheckoutError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

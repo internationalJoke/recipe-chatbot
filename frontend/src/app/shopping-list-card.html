@@ -54,6 +54,9 @@
               </a>
               <strong [class.zero]="!group.lines.length">{{ money(group.totalCents, order.currency) }}</strong>
             </header>
+            <p class="branch">
+              @if (branchLabel(order, group.store); as label) { 📍 {{ label }} } @else { Online prices (default store) }
+            </p>
             @if (group.lines.length) {
               <ul>
                 @for (line of group.lines; track line.itemId) {
@@ -117,7 +120,7 @@
             </tr>
           </tfoot>
         </table>
-        <p class="note">Prices from willys.se and hemkop.se on {{ when(cmp.comparedAt ?? order.createdAt) }}. Prices change often. Items sold by weight are estimates.</p>
+        <p class="note">Prices from willys.se and hemkop.se on {{ when(cmp.comparedAt ?? order.createdAt) }}{{ usedNearby(order) ? ', at the stores nearest you' : '' }}. Prices change often. Items sold by weight are estimates.</p>
       </details>
     } @else {
       <div class="receipt">
@@ -164,7 +167,7 @@
     <div class="actions">
       <button type="button" class="decline" (click)="decline()" [disabled]="busy()">Decline</button>
       <button type="button" class="accept" (click)="accept()" [disabled]="busy() || selectedCount() === 0">
-        {{ busy() ? 'Checking Willys & Hemköp…' : 'Compare prices for ' + selectedCount() + ' item' + (selectedCount() === 1 ? '' : 's') }}
+        {{ locating() ? 'Finding stores near you…' : busy() ? 'Checking Willys & Hemköp…' : 'Compare prices for ' + selectedCount() + ' item' + (selectedCount() === 1 ? '' : 's') }}
       </button>
     </div>
   }

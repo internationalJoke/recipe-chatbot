@@ -83,14 +83,18 @@ export function parseProducts(store: StoreId, data: unknown): StoreProduct[] {
 
 const cache = new Map<string, { at: number; products: StoreProduct[] }>();
 
-/** Searches one store. Results are cached for an hour to stay polite and fast. */
+/**
+ * Searches one store. Results are cached for an hour to stay polite and fast.
+ * With a `branch` (a store id and its session cookie) prices are that store's; otherwise the
+ * site's default store is used.
+ */
 export async function searchStore(
   store: StoreId,
   term: string,
-  options: { signal?: AbortSignal; fetchFn?: typeof fetch; now?: () => number } = {},
+  options: { signal?: AbortSignal; fetchFn?: typeof fetch; now?: () => number; branch?: { id: string; cookie: string } } = {},
 ): Promise<StoreProduct[]> {
   const query = term.trim().toLowerCase().slice(0, 80);
-  const key = `${store}:${query}`;
+  const key = `${store}:${options.branch?.id ?? "default"}:${query}`;
   const now = options.now ?? Date.now;
   const hit = cache.get(key);
   if (hit && now() - hit.at < CACHE_TTL_MS) return hit.products;
@@ -102,7 +106,11 @@ export async function searchStore(
   let response: Response;
   try {
     response = await (options.fetchFn ?? fetch)(url, {
-      headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (RecipeBox price check)" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Mozilla/5.0 (RecipeBox price check)",
+        ...(options.branch ? { Cookie: options.branch.cookie } : {}),
+      },
       signal,
     });
   } catch (error) {
