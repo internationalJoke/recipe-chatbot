@@ -25,6 +25,7 @@ import { RecipeFlow } from './recipe-flow';
 import { FridgeCartoon } from './fridge-cartoon';
 import { ProduceLogo } from './produce-logo';
 import { ShoppingListCard } from './shopping-list-card';
+import { LocationBadge } from './location-badge';
 
 // The model's machine-readable list is hidden while it streams; the server strips it on save.
 const LIST_TAG = '<shopping_list>';
@@ -59,7 +60,7 @@ function readCollapsed() {
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon, ProduceLogo, RecipeFlow],
+  imports: [CommonModule, FormsModule, ShoppingListCard, FridgeCartoon, ProduceLogo, RecipeFlow, LocationBadge],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.css',

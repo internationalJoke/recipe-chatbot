@@ -85,6 +85,7 @@
         <p>Conversation</p>
         <h1>{{ activeConversation()?.title || 'New conversation' }}</h1>
       </div>
+      <app-location-badge />
     </header>
 
     <section #messageList class="messages" aria-live="polite">

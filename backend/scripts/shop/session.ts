@@ -1,6 +1,7 @@
 import { chromium, type BrowserContext, type Page } from "playwright";
 import { compareShops, type ShopId, type ShopResults, type ShopTotal } from "@/lib/cart/compare-shops";
 import { savedLocationFromToday } from "@/lib/cart/saved-location";
+import { chosenItems } from "@/lib/cart/chosen-items";
 import { parseStoredItems, type ShoppingItem } from "@/lib/shopping-list";
 import type { StoreId, StoreProduct } from "@/lib/stores/axfood";
 import type { Location } from "@/lib/stores/branches";
@@ -52,7 +53,7 @@ export async function loadList(shoppingListId?: string): Promise<{ items: Shoppi
     ? await prisma.shoppingList.findUnique({ where: { id: shoppingListId }, include })
     : await prisma.shoppingList.findFirst({ orderBy: { createdAt: "desc" }, include });
   if (!list) throw new Error(shoppingListId ? `No shopping list ${shoppingListId}` : "No shopping lists yet: ask the chatbot for a recipe first");
-  const items = parseStoredItems(list.items).filter((item) => !item.have);
+  const items = chosenItems(parseStoredItems(list.items), list.order?.comparison);
   if (items.length === 0) throw new Error("The shopping list is empty");
   return { items, near: savedLocationFromToday(list.order) };
 }

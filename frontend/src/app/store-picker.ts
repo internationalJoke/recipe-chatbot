@@ -45,6 +45,10 @@ export class StorePicker {
 
   constructor() {
     effect(() => this.available.emit(!this.offline() && this.status() !== null));
+    effect(() => {
+      const area = this.status()?.area;
+      if (area) this.helper.area.set(area);
+    });
     void this.refresh();
     const timer = setInterval(() => {
       if (this.running()) void this.refresh();

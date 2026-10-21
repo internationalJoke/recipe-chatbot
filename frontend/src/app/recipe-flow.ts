@@ -31,6 +31,8 @@ export class RecipeFlow {
   readonly busy = input(false);
   /** The local shop helper runs, so the Prices tab shows its three-shop comparison instead. */
   readonly helperAvailable = signal(false);
+  /** Ticked items on a list waiting for Compare; null until the list card reports it. */
+  readonly ticked = signal<number | null>(null);
   readonly chosen = output<string[]>();
   readonly listChanged = output<ShoppingList>();
 
@@ -80,8 +82,12 @@ export class RecipeFlow {
     if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy)) this.move(dx < 0 ? 1 : -1);
   }
 
+  /** Counts only ticked items: live while choosing, then the ones kept at Accept. */
   listLabel() {
-    const count = this.message().shoppingList?.items.length;
+    const list = this.message().shoppingList;
+    const comparison = list?.order?.comparison;
+    const proposed = list?.status === 'PROPOSED' ? (this.ticked() ?? list.items.filter((item) => !item.have).length) : null;
+    const count = comparison ? comparison.items.length : (proposed ?? list?.items.length);
     return count ? `Shopping list · ${count}` : 'Shopping list';
   }
 }

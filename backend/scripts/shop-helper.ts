@@ -21,13 +21,15 @@ import {
   shopViews,
   type HelperStatus,
 } from "@/lib/cart/helper-protocol";
-import { locatePostcode, postcodeAt } from "@/lib/cart/postcode";
+import { locatePostcode, placeAt, type Place } from "@/lib/cart/postcode";
+import type { Location } from "@/lib/stores/branches";
 import { say, setUserChannel } from "./shop/browser";
 import { comparePrices, fillCart, launchBrowser, loadList, openShops, SHOP_NAMES, type Shop } from "./shop/session";
 
 const MAX_BODY_BYTES = 10_000;
+const LOOKUP_GAP_MS = 1_000; // Nominatim allows one request per second
 
-let status: HelperStatus = { phase: "idle", shoppingListId: null, message: "Ready.", question: null, shops: [], cart: null };
+let status: HelperStatus = { phase: "idle", shoppingListId: null, message: "Ready.", question: null, area: null, shops: [], cart: null };
 let context: BrowserContext | null = null;
 let session: { shops: Shop[]; totals: ShopTotal[] } = { shops: [], totals: [] };
 let answer: ((skip: boolean) => void) | null = null;
@@ -76,14 +78,26 @@ function fail(error: unknown) {
   update({ phase: "error", message, question: null });
 }
 
+/** The point and place the stores are searched near: a typed postcode wins over the browser's location. */
+async function findArea(typed: string | null, here: Location | null): Promise<{ located: Location | null; area: Place | null }> {
+  if (typed) {
+    const located = await locatePostcode(typed);
+    if (located) await new Promise((resolve) => setTimeout(resolve, LOOKUP_GAP_MS));
+    const city = located ? (await placeAt(located)).city : null;
+    return { located, area: { postcode: typed, city } };
+  }
+  if (!here) return { located: null, area: null };
+  return { located: here, area: await placeAt(here) };
+}
+
 async function runCompare(request: ReturnType<typeof compareRequestSchema.parse>) {
-  update({ phase: "working", shoppingListId: request.shoppingListId, message: "Opening the shops…", question: null, shops: [], cart: null });
+  update({ phase: "working", shoppingListId: request.shoppingListId, message: "Opening the shops…", question: null, area: null, shops: [], cart: null });
   try {
     const { items, near } = await loadList(request.shoppingListId);
     // A typed postcode wins; otherwise the page's location, then the one saved at Accept today.
-    const here = request.location ?? near;
-    const postcode = request.postcode ?? (here ? await postcodeAt(here) : null);
-    const located = request.postcode ? await locatePostcode(request.postcode) : here;
+    const { located, area } = await findArea(request.postcode, request.location ?? near);
+    const postcode = area?.postcode ?? null;
+    update({ area });
     say(postcode ? `Finding the stores nearest postcode ${postcode}…` : "No location: using the shops' default stores.");
 
     const opened = await browser();

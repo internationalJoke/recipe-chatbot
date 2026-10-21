@@ -162,12 +162,19 @@ export interface ShopView {
   lines: { item: string; product: string; size: string; costCents: number; url: string }[];
 }
 
+export interface Place {
+  postcode: string | null;
+  city: string | null;
+}
+
 export interface HelperStatus {
   phase: 'idle' | 'working' | 'waiting' | 'ready' | 'done' | 'error';
   shoppingListId: string | null;
   message: string;
   /** Set while the helper waits for the user, e.g. to log in with BankID. */
   question: string | null;
+  /** Where the stores were searched near: a typed postcode, or the browser's location. */
+  area: Place | null;
   shops: ShopView[];
   cart: { shop: ShopId; added: string[]; failed: { product: string; url: string }[]; skipped: boolean } | null;
 }

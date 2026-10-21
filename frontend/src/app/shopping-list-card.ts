@@ -30,6 +30,8 @@ export class ShoppingListCard {
   /** 'list' shows only the items, 'prices' only the comparison; 'all' shows whichever fits the status. */
   readonly view = input<'all' | 'list' | 'prices'>('all');
   readonly changed = output<ShoppingList>();
+  /** How many items are ticked, while the list waits for Compare; the tab title shows it. */
+  readonly selectedChange = output<number>();
 
   // Item ids the user flipped. Items start ticked, except ones the user likely has already.
   private readonly flipped = signal<ReadonlySet<string>>(new Set());
@@ -38,6 +40,9 @@ export class ShoppingListCard {
     // A list waiting for Compare: get the location ready if the user already allowed it.
     effect(() => {
       if (this.list().status === 'PROPOSED') void prefetchLocation();
+    });
+    effect(() => {
+      if (this.list().status === 'PROPOSED') this.selectedChange.emit(this.selectedCount());
     });
   }
   readonly busy = signal(false);

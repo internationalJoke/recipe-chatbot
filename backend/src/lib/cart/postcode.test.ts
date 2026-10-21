@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { locatePostcode, normalizePostcode, postcodeAt } from "@/lib/cart/postcode";
+import { locatePostcode, normalizePostcode, placeAt, postcodeAt } from "@/lib/cart/postcode";
 
 describe("normalizePostcode", () => {
   it("accepts five digits with or without a space", () => {
@@ -43,5 +43,25 @@ describe("postcodeAt", () => {
     await expect(postcodeAt({ lat: 0, lon: 0 }, reply({ error: "Unable to geocode" }))).resolves.toBeNull();
     await expect(postcodeAt({ lat: 59, lon: 18 }, reply(null, false))).resolves.toBeNull();
     await expect(postcodeAt({ lat: 59, lon: 18 }, vi.fn<typeof fetch>(async () => { throw new Error("offline"); }))).resolves.toBeNull();
+  });
+});
+
+describe("placeAt", () => {
+  const reply = (body: unknown, ok = true) => vi.fn<typeof fetch>(async () => ({ ok, json: async () => body }) as Response);
+
+  it("returns the postcode and city at a location", async () => {
+    const fetchFn = reply({ address: { postcode: "752 30", city: "Uppsala" } });
+    await expect(placeAt({ lat: 59.85, lon: 17.62 }, fetchFn)).resolves.toEqual({ postcode: "75230", city: "Uppsala" });
+    expect(String(fetchFn.mock.calls[0][0])).toContain("accept-language=en");
+  });
+
+  it("falls back to town, village or municipality for the city", async () => {
+    await expect(placeAt({ lat: 59, lon: 18 }, reply({ address: { postcode: "18330", town: "Täby" } }))).resolves.toEqual({ postcode: "18330", city: "Täby" });
+    await expect(placeAt({ lat: 59, lon: 18 }, reply({ address: { municipality: "Knivsta kommun" } }))).resolves.toEqual({ postcode: null, city: "Knivsta kommun" });
+  });
+
+  it("returns nulls when the lookup fails", async () => {
+    await expect(placeAt({ lat: 59, lon: 18 }, reply(null, false))).resolves.toEqual({ postcode: null, city: null });
+    await expect(placeAt({ lat: 59, lon: 18 }, vi.fn<typeof fetch>(async () => { throw new Error("offline"); }))).resolves.toEqual({ postcode: null, city: null });
   });
 });

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { GeoPoint } from './location';
-import { HelperStatus, ShopId } from './models';
+import { HelperStatus, Place, ShopId } from './models';
 
 // Talks to the shop helper running on this computer (`npm run shop:helper` in backend/). It drives a
 // visible Chrome window, because BankID logins and store carts cannot live inside our page.
@@ -9,6 +9,8 @@ import { HelperStatus, ShopId } from './models';
 export class ShopHelperService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = 'http://localhost:3200';
+  /** Where the last price check searched for stores; the header shows it. */
+  readonly area = signal<Place | null>(null);
 
   status() {
     return this.http.get<HelperStatus>(`${this.baseUrl}/status`);

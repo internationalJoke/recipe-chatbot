@@ -23,7 +23,7 @@
     }
     @case ('list') {
       @if (message().shoppingList; as list) {
-        <app-shopping-list-card view="list" [list]="list" (changed)="listChanged.emit($event)" />
+        <app-shopping-list-card view="list" [list]="list" (changed)="listChanged.emit($event)" (selectedChange)="ticked.set($event)" />
       }
     }
     @case ('prices') {

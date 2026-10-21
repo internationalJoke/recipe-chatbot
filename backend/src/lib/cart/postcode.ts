@@ -8,7 +8,17 @@ const LOOKUP_URL = "https://nominatim.openstreetmap.org";
 const TIMEOUT_MS = 10_000;
 
 const searchSchema = z.array(z.object({ lat: z.coerce.number(), lon: z.coerce.number() }));
-const reverseSchema = z.object({ address: z.object({ postcode: z.string() }) });
+const reverseSchema = z.object({
+  address: z.object({
+    postcode: z.string().optional(),
+    city: z.string().optional(),
+    town: z.string().optional(),
+    village: z.string().optional(),
+    municipality: z.string().optional(),
+  }),
+});
+
+export type Place = { postcode: string | null; city: string | null };
 
 /** "753 20" → "75320"; null if it is not five digits. */
 export function normalizePostcode(input: string): string | null {
@@ -34,8 +44,16 @@ export async function locatePostcode(postcode: string, fetchFn: typeof fetch = f
   return first ? { lat: first.lat, lon: first.lon } : null;
 }
 
+/** The Swedish postcode and the city or town at a location, e.g. { postcode: "75230", city: "Uppsala" }. */
+export async function placeAt(location: Location, fetchFn: typeof fetch = fetch): Promise<Place> {
+  const path = `reverse?lat=${location.lat}&lon=${location.lon}&format=json&zoom=18&accept-language=en`;
+  const parsed = reverseSchema.safeParse(await lookup(path, fetchFn));
+  if (!parsed.success) return { postcode: null, city: null };
+  const { postcode, city, town, village, municipality } = parsed.data.address;
+  return { postcode: postcode ? normalizePostcode(postcode) : null, city: city ?? town ?? village ?? municipality ?? null };
+}
+
 /** The Swedish postcode at a location, e.g. "11120"; null if there is none. */
 export async function postcodeAt(location: Location, fetchFn: typeof fetch = fetch): Promise<string | null> {
-  const parsed = reverseSchema.safeParse(await lookup(`reverse?lat=${location.lat}&lon=${location.lon}&format=json&zoom=18`, fetchFn));
-  return parsed.success ? normalizePostcode(parsed.data.address.postcode) : null;
+  return (await placeAt(location, fetchFn)).postcode;
 }

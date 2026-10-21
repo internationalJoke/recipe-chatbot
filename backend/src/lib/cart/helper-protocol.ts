@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ShopId, ShopTotal } from "@/lib/cart/compare-shops";
-import { normalizePostcode } from "@/lib/cart/postcode";
+import { normalizePostcode, type Place } from "@/lib/cart/postcode";
 
 // What the web page and the local shop helper (scripts/shop-helper.ts) send each other.
 
@@ -47,6 +47,8 @@ export type HelperStatus = {
   message: string;
   /** Set while waiting for the user, e.g. "log in with BankID, then continue". */
   question: string | null;
+  /** Where the stores were searched near, e.g. { postcode: "75230", city: "Uppsala" }. */
+  area: Place | null;
   shops: ShopView[];
   cart: { shop: ShopId; added: string[]; failed: { product: string; url: string }[]; skipped: boolean } | null;
 };

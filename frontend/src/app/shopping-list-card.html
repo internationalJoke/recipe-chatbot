@@ -16,7 +16,7 @@
   @if (list().status === 'ACCEPTED' && list().order; as order) {
     @if (view() !== 'prices') {
     <details class="your-list" open>
-      <summary>Your list · {{ acceptedIds(order).size }} of {{ list().items.length }} items compared</summary>
+      <summary>Your list · {{ acceptedIds(order).size }} {{ acceptedIds(order).size === 1 ? 'item' : 'items' }}</summary>
       <ul class="items">
         @for (item of list().items; track item.id) {
           <li>
