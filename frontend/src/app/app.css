@@ -55,8 +55,6 @@ button { color: inherit; }
 .history-item:hover .delete-button, .delete-button:focus { opacity: 1; }
 .delete-button:hover { color: var(--tomato); background: var(--tomato-soft); }
 .empty-history { padding: 12px 9px; color: var(--muted); font-size: 13px; line-height: 1.5; }
-.local-badge { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin: 14px 8px 0; padding: 4px 10px 4px 8px; border-radius: 999px; color: var(--ink-soft); background: rgba(255, 255, 255, .75); font-size: 11px; font-weight: 600; }
-.local-badge em { overflow: hidden; text-overflow: ellipsis; }
 
 /* Collapsed sidebar: a Gemini-style rail of round icon buttons with hover labels. */
 .collapsed .sidebar { padding: 18px 0 20px; align-items: center; overflow: visible; }
@@ -66,14 +64,11 @@ button { color: inherit; }
 .collapsed .collapse-button, .collapsed .new-chat { width: 42px; height: 42px; padding: 0; border-radius: 50%; color: var(--ink); background: transparent; box-shadow: none; transform: none; }
 .collapsed .collapse-button { background: rgba(255, 255, 255, .7); }
 .collapsed .collapse-button:hover, .collapsed .new-chat:hover { color: var(--leaf-dark); background: #fff; }
-.collapsed .local-badge { position: relative; align-self: center; margin-top: auto; padding: 8px; justify-content: center; }
 [data-tip]:hover::after, [data-tip]:focus-visible::after {
   content: attr(data-tip); position: absolute; z-index: 60; left: calc(100% + 12px); top: 50%; transform: translateY(-50%);
   padding: 8px 14px; border-radius: 10px; color: #fff; background: var(--ink); box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
   font-size: 13px; font-weight: 500; white-space: nowrap; pointer-events: none;
 }
-.local-badge span { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 3px rgba(46, 158, 85, .15); }
-.local-badge.offline span { background: var(--tomato); box-shadow: 0 0 0 3px rgba(239, 75, 63, .15); }
 
 /* Chat panel */
 .chat-panel { min-width: 0; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }

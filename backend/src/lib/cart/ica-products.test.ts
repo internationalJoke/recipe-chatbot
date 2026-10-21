@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { icaCartQuantity, icaProductsFromHtml, icaSuggestion, isHumanCheck, parseIcaProducts } from "@/lib/cart/ica-products";
+import { icaCartQuantity, icaPageProductId, icaProductsFromHtml, icaSuggestion, isHumanCheck, parseIcaProducts } from "@/lib/cart/ica-products";
 
 const STORE = "https://handlaprivatkund.ica.se/stores/1003380";
 
@@ -70,6 +70,17 @@ describe("icaProductsFromHtml", () => {
   it("reads products from the page's initial state, in search order", () => {
     const products = icaProductsFromHtml(html(JSON.stringify(state).replace(/\//g, "\\u002F")), STORE);
     expect(products.map((p) => [p.code, p.price])).toEqual([["2", 41.49], ["1", 37.44]]);
+  });
+
+  it("links each product to the search page it was found on", () => {
+    const products = icaProductsFromHtml(html(JSON.stringify(state)), STORE, `${STORE}/search?q=chicken%20wing`);
+    expect(products.map((p) => p.url)).toEqual([`${STORE}/search?q=chicken%20wing`, `${STORE}/search?q=chicken%20wing`]);
+  });
+
+  it("finds ICA's page id (the one on the product card) for a product code", () => {
+    expect(icaPageProductId(html(JSON.stringify(state)), "1")).toBe("uuid-1");
+    expect(icaPageProductId(html(JSON.stringify(state)), "9")).toBeNull();
+    expect(icaPageProductId("<html></html>", "1")).toBeNull();
   });
 
   it("returns nothing for pages without state or with broken JSON", () => {

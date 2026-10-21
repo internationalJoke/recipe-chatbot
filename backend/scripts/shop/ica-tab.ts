@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import type { Page } from "playwright";
-import { icaCartQuantity, icaProductsFromHtml, icaSuggestion, isHumanCheck } from "@/lib/cart/ica-products";
+import { icaCartQuantity, icaPageProductId, icaProductsFromHtml, icaSuggestion, isHumanCheck } from "@/lib/cart/ica-products";
 import { nearestPickupStore, parsePickupStores } from "@/lib/cart/ica-stores";
 import { icaPageLoggedIn } from "@/lib/cart/sessions";
 import type { StoreProduct } from "@/lib/stores/axfood";
@@ -106,12 +106,14 @@ async function waitForHumanCheck(page: Page) {
 
 /** Searches the store; with no results, tries ICA's first suggestion (e.g. "svartpepparkorn" → "svartpeppar"). */
 export async function searchIca(page: Page, storeUrl: string, term: string): Promise<StoreProduct[]> {
-  let html = await openSearch(page, `${storeUrl}/search?q=${encodeURIComponent(term)}`);
-  let products = icaProductsFromHtml(html, storeUrl);
+  const searchUrl = `${storeUrl}/search?q=${encodeURIComponent(term)}`;
+  let html = await openSearch(page, searchUrl);
+  let products = icaProductsFromHtml(html, storeUrl, searchUrl);
   const suggestion = products.length === 0 ? icaSuggestion(html) : null;
   if (suggestion) {
-    html = await openSearch(page, new URL(suggestion, storeUrl).href);
-    products = icaProductsFromHtml(html, storeUrl);
+    const suggestionUrl = new URL(suggestion, storeUrl).href;
+    html = await openSearch(page, suggestionUrl);
+    products = icaProductsFromHtml(html, storeUrl, suggestionUrl);
   }
   if (products.length === 0) await saveDebug(term, html);
   return products;
@@ -139,11 +141,13 @@ async function quantityInCart(page: Page, storeUrl: string, productId: string) {
  * (it may be there from an earlier run), and checks the result against ICA's cart.
  */
 export async function addIca(page: Page, storeUrl: string, offer: Offer) {
-  await openSearch(page, offer.url);
-  await page.waitForLoadState("networkidle", { timeout: PAGE_TIMEOUT_MS }).catch(() => undefined);
-  const card = page.locator("[data-test^='fop-wrapper:']").filter({ hasText: offer.product }).first();
-  const productId = (await card.getAttribute("data-test", { timeout: PAGE_TIMEOUT_MS }).catch(() => null))?.split(":")[1];
+  // offer.url is the search that found the product, so its card is on this page; the card is found
+  // by ICA's id, not by name (names with "&" or "®" do not search or match well).
+  const html = await openSearch(page, offer.url);
+  const productId = icaPageProductId(html, offer.code);
   if (!productId) return false;
+  await page.waitForLoadState("networkidle", { timeout: PAGE_TIMEOUT_MS }).catch(() => undefined);
+  const card = page.locator(`[data-test^='fop-wrapper:${productId}']`).first();
 
   const wanted = offer.size.startsWith("≈") ? 1 : Math.max(1, Math.round(offer.amount)); // by weight: one piece
   let have = await quantityInCart(page, storeUrl, productId);
@@ -152,7 +156,7 @@ export async function addIca(page: Page, storeUrl: string, offer: Offer) {
     return true;
   }
   if (have === 0) {
-    await clickFirstVisible([card.getByRole("button", { name: `Lägg till ${offer.product} i varukorg`, exact: true })]);
+    await clickFirstVisible([card.getByRole("button", { name: /^lägg till/i })]);
     await page.waitForTimeout(CART_UPDATE_MS);
     have = await quantityInCart(page, storeUrl, productId);
   }

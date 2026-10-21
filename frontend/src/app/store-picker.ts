@@ -23,8 +23,6 @@ export class StorePicker {
   readonly listId = input.required<string>();
   /** Whether the helper is running; the page then shows only this panel's prices. */
   readonly available = output<boolean>();
-  /** The cheapest complete shop's total in öre, once compared; null before that. */
-  readonly bestTotal = output<number | null>();
 
   readonly status = signal<HelperStatus | null>(null);
   /** The helper is not running on this computer. */
@@ -47,10 +45,6 @@ export class StorePicker {
 
   constructor() {
     effect(() => this.available.emit(!this.offline() && this.status() !== null));
-    effect(() => {
-      const best = this.mine()?.shops.find((shop) => shop.shop === this.cheapest());
-      this.bestTotal.emit(this.running() ? null : (best?.totalCents ?? null));
-    });
     void this.refresh();
     const timer = setInterval(() => {
       if (this.running()) void this.refresh();

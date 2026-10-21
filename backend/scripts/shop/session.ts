@@ -4,7 +4,7 @@ import { savedLocationFromToday } from "@/lib/cart/saved-location";
 import { parseStoredItems, type ShoppingItem } from "@/lib/shopping-list";
 import type { StoreId, StoreProduct } from "@/lib/stores/axfood";
 import type { Location } from "@/lib/stores/branches";
-import { addAxfood, axfoodLoggedIn, chooseNearestAxfood, openAxfood, searchAxfood } from "./axfood-tab";
+import { activateStore, addAxfood, axfoodLoggedIn, chooseNearestAxfood, openAxfood, searchAxfood } from "./axfood-tab";
 import { acceptCookies, loginWithBankId, say } from "./browser";
 import { addIca, chooseNearestIca, findIcaStore, ICA_START_URL, icaLoggedIn, searchIca } from "./ica-tab";
 
@@ -20,7 +20,9 @@ export const SHOP_NAMES: Record<ShopId, string> = { willys: "Willys", hemkop: "H
 /** A tab that can search and add to its cart. Willys and Hemköp show prices without a login. */
 export type Shop = {
   id: ShopId;
-  page: Page;
+  /** The shop's tab, opened again at the same store if the user closed it. */
+  tab: () => Promise<Page>;
+  close: () => Promise<void>;
   loggedIn: boolean;
   /** The store whose prices are used, e.g. "Willys Uppsala Stenhagen"; null = the site's default. */
   storeName: string | null;
@@ -103,10 +105,20 @@ async function openIca(context: BrowserContext, postcode: string | null, user: L
   }
   const distance = nearest?.distanceKm != null ? ` (${nearest.distanceKm.toFixed(1)} km)` : "";
   say(`ICA: using ${nearest?.name ?? storeUrl}${distance}`);
+  let tab = page;
+  const open = async () => {
+    if (tab.isClosed()) {
+      tab = await context.newPage();
+      await tab.goto(storeUrl);
+    }
+    return tab;
+  };
   const shop: Shop = {
-    id: "ica", page, loggedIn: true, storeName: nearest?.name ?? null, distanceKm: nearest?.distanceKm ?? null,
-    isLoggedIn: () => icaLoggedIn(page),
-    search: (term) => searchIca(page, storeUrl, term), add: ({ offer }) => addIca(page, storeUrl, offer),
+    id: "ica", tab: open, close: () => tab.close().catch(() => undefined), loggedIn: true,
+    storeName: nearest?.name ?? null, distanceKm: nearest?.distanceKm ?? null,
+    isLoggedIn: async () => icaLoggedIn(await open()),
+    search: async (term) => searchIca(await open(), storeUrl, term),
+    add: async ({ offer }) => addIca(await open(), storeUrl, offer),
   };
   return { shop, location: nearest?.location ?? null };
 }
@@ -118,10 +130,21 @@ async function openAxfoodShop(context: BrowserContext, id: StoreId, location: Lo
   await acceptCookies(page);
   const branch = location ? await chooseNearestAxfood(page, id, location) : null;
   say(`${SHOP_NAMES[id]}: using ${branch ? `${branch.name} (${branch.distanceKm.toFixed(1)} km)` : "the site's default store"}`);
+  let tab = page;
+  const open = async () => {
+    if (tab.isClosed()) {
+      tab = await context.newPage();
+      await openAxfood(tab, id);
+      if (branch) await activateStore(tab, branch.id);
+    }
+    return tab;
+  };
   return {
-    id, page, loggedIn: false, storeName: branch?.name ?? null, distanceKm: branch?.distanceKm ?? null,
-    isLoggedIn: () => axfoodLoggedIn(page, id),
-    search: (term) => searchAxfood(page, id, term), add: ({ offer }) => addAxfood(page, offer),
+    id, tab: open, close: () => tab.close().catch(() => undefined), loggedIn: false,
+    storeName: branch?.name ?? null, distanceKm: branch?.distanceKm ?? null,
+    isLoggedIn: async () => axfoodLoggedIn(await open(), id),
+    search: async (term) => searchAxfood(await open(), id, term),
+    add: async ({ offer }) => addAxfood(await open(), offer),
   };
 }
 
@@ -156,9 +179,10 @@ export async function comparePrices(shops: Shop[], items: ShoppingItem[]) {
 
 /** Logs in if needed and adds the picks to the shop's cart. Never orders or pays. */
 export async function fillCart(shop: Shop, total: ShopTotal): Promise<CartResult> {
-  await shop.page.bringToFront();
+  const page = await shop.tab();
+  await page.bringToFront();
   if (!shop.loggedIn) {
-    const login = await loginWithBankId(shop.page, SHOP_NAMES[shop.id], shop.isLoggedIn);
+    const login = await loginWithBankId(page, SHOP_NAMES[shop.id], shop.isLoggedIn);
     if (!login.loggedIn) return { added: [], failed: [], skipped: true, reason: login.reason };
     shop.loggedIn = true;
   }
@@ -170,6 +194,6 @@ export async function fillCart(shop: Shop, total: ShopTotal): Promise<CartResult
     if (ok) added.push(pick.offer.amountLabel);
     else failed.push({ product: pick.offer.product, url: pick.offer.url });
   }
-  await shop.page.reload(); // so the cart badge shows the new items
+  await (await shop.tab()).reload(); // so the cart badge shows the new items
   return { added, failed, skipped: false };
 }

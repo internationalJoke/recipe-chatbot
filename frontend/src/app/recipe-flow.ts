@@ -31,7 +31,6 @@ export class RecipeFlow {
   readonly busy = input(false);
   /** The local shop helper runs, so the Prices tab shows its three-shop comparison instead. */
   readonly helperAvailable = signal(false);
-  readonly helperBestCents = signal<number | null>(null);
   readonly chosen = output<string[]>();
   readonly listChanged = output<ShoppingList>();
 
@@ -84,14 +83,5 @@ export class RecipeFlow {
   listLabel() {
     const count = this.message().shoppingList?.items.length;
     return count ? `Shopping list · ${count}` : 'Shopping list';
-  }
-
-  pricesLabel() {
-    // With the shop helper, only the 3-shop comparison counts, and only once the user has run it.
-    const cmp = this.message().shoppingList?.order?.comparison;
-    const cents = this.helperAvailable() ? this.helperBestCents() : cmp?.recommendation.totalCents;
-    if (cents == null) return 'Prices';
-    const total = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: cmp?.currency ?? 'SEK' }).format(cents / 100);
-    return `Prices · ${total}`;
   }
 }

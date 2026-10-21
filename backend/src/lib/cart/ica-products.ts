@@ -83,23 +83,38 @@ type IcaState = {
   };
 };
 
-/** Search results from the HTML ICA sends, in the order ICA lists them. */
-export function icaProductsFromHtml(html: string, storeUrl: string): StoreProduct[] {
+function readState(html: string): IcaState | null {
   const marker = STATE_MARKER.exec(html);
-  if (!marker) return [];
+  if (!marker) return null;
   const start = marker.index + marker[0].length;
   const end = html.indexOf("</script>", start);
   const json = html.slice(start, end === -1 ? undefined : end).trim().replace(/;$/, "");
-  let state: IcaState;
   try {
-    state = JSON.parse(json);
+    return JSON.parse(json);
   } catch {
-    return [];
+    return null;
   }
+}
+
+/**
+ * Search results from the HTML ICA sends, in the order ICA lists them. `pageUrl` (the search that
+ * found them) becomes each product's link, so adding it later opens a page where it is listed.
+ */
+export function icaProductsFromHtml(html: string, storeUrl: string, pageUrl?: string): StoreProduct[] {
+  const state = readState(html);
+  if (!state) return [];
   const entities = state.data?.products?.productEntities ?? {};
   const ids = (state.data?.search?.catalogue?.data?.productGroups ?? []).flatMap((group) => group.products ?? []);
   const ordered = ids.length > 0 ? ids.map((id) => entities[id]).filter(Boolean) : Object.values(entities);
-  return parseIcaProducts([ordered], storeUrl);
+  const products = parseIcaProducts([ordered], storeUrl);
+  return pageUrl ? products.map((product) => ({ ...product, url: pageUrl })) : products;
+}
+
+/** ICA's page id for a product code: the UUID in the product card's `data-test="fop-wrapper:<id>"`. */
+export function icaPageProductId(html: string, code: string): string | null {
+  const entities = Object.values(readState(html)?.data?.products?.productEntities ?? {}) as Json[];
+  const entity = entities.find((e) => isObject(e) && String(e.retailerProductId ?? e.productId) === code);
+  return entity && typeof entity.productId === "string" ? entity.productId : null;
 }
 
 /** ICA's bot check ("Human Verification") instead of the page asked for. */

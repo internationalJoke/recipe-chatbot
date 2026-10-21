@@ -67,8 +67,10 @@ async function browser() {
 }
 
 function fail(error: unknown) {
-  const closed = !context || /closed|Target page/i.test(String(error));
-  const message = closed ? "The Chrome window was closed. Start again." : error instanceof Error ? error.message : String(error);
+  const tabClosed = /closed|Target page/i.test(String(error));
+  const message = !context
+    ? "The Chrome window was closed. Start again."
+    : tabClosed ? "A shop tab was closed while it was working. Click the button again." : error instanceof Error ? error.message : String(error);
   console.error("Shop helper failed:", error);
   answer = null;
   update({ phase: "error", message, question: null });
@@ -85,7 +87,7 @@ async function runCompare(request: ReturnType<typeof compareRequestSchema.parse>
     say(postcode ? `Finding the stores nearest postcode ${postcode}…` : "No location: using the shops' default stores.");
 
     const opened = await browser();
-    await Promise.all(session.shops.map((shop) => shop.page.close().catch(() => undefined)));
+    await Promise.all(session.shops.map((shop) => shop.close()));
     const shops = await openShops(opened, postcode, located);
     const totals = await comparePrices(shops, items);
     session = { shops, totals };

@@ -17,7 +17,7 @@
       @if (s.shops.length) {
         <div class="shops">
           @for (view of s.shops; track view.shop) {
-            <article class="shop" [class.best]="view.shop === cheapest()" [class.chosen]="s.cart?.shop === view.shop">
+            <article class="shop" [class.best]="view.shop === cheapest() && !filledShop()" [class.chosen]="filledShop() === view.shop" [class.dim]="filledShop() && filledShop() !== view.shop">
               <header class="shop-head">
                 <span class="brand" [style.--brand]="brand(view.shop).color">
                   @if (brand(view.shop).logoUrl; as logo) {
@@ -51,8 +51,8 @@
                 <p class="missing">Not at this store: {{ view.missing.join(', ') }}</p>
               }
               <!-- A store missing an ingredient cannot cover the dish, so it cannot be picked. -->
-              <button type="button" class="primary buy" [disabled]="running() || filledShop() || view.missing.length > 0" (click)="buy(view.shop)">
-                {{ filledShop() === view.shop ? 'In your cart ✓' : view.missing.length ? 'Missing ' + view.missing.length + (view.missing.length === 1 ? ' item' : ' items') : 'Buy at ' + view.name }}
+              <button type="button" class="primary buy" [class.in-cart]="filledShop() === view.shop" [disabled]="running() || filledShop() || view.missing.length > 0" (click)="buy(view.shop)">
+                {{ filledShop() === view.shop ? (s.cart?.failed?.length ? s.cart!.added.length + ' of ' + view.lines.length + ' in your cart' : 'In your cart ✓') : view.missing.length ? 'Missing ' + view.missing.length + (view.missing.length === 1 ? ' item' : ' items') : 'Buy at ' + view.name }}
               </button>
             </article>
           }
@@ -79,15 +79,20 @@
       @if (s.cart; as cart) {
         <div class="cart" [class.empty]="cart.skipped">
           @if (cart.added.length) {
-            <p><strong>In your cart:</strong> {{ cart.added.join(' · ') }}</p>
+            <p><strong>In your cart ({{ cart.added.length }})</strong></p>
+            <ul class="cart-list">
+              @for (item of cart.added; track $index) {
+                <li><span class="tick" aria-hidden="true">✓</span>{{ item }}</li>
+              }
+            </ul>
           }
           @if (cart.failed.length) {
-            <p>
-              <strong>Add these yourself:</strong>
-              @for (item of cart.failed; track item.url) {
-                <a [href]="item.url" target="_blank" rel="noopener noreferrer">{{ item.product }}</a>
+            <p><strong>Add these yourself ({{ cart.failed.length }})</strong></p>
+            <ul class="cart-list">
+              @for (item of cart.failed; track $index) {
+                <li><span class="cross" aria-hidden="true">✗</span><a [href]="item.url" target="_blank" rel="noopener noreferrer">{{ item.product }}</a></li>
               }
-            </p>
+            </ul>
           }
           @if (!cart.skipped) {
             <p class="hint">Check the cart in the Chrome window, then pay at the store's site when you are ready.</p>

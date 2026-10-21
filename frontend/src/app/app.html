@@ -77,8 +77,6 @@
         <p class="empty-history">Your conversations will appear here.</p>
       }
     </nav>
-
-    <div class="local-badge" [class.offline]="health()?.llm !== 'ok'" [attr.data-tip]="sidebarCollapsed() ? modelLabel() : null"><span></span><em>{{ modelLabel() }}</em></div>
   </aside>
 
   <main class="chat-panel">

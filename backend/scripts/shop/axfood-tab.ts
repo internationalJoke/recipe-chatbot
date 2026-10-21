@@ -20,7 +20,7 @@ export async function axfoodLoggedIn(page: Page, store: StoreId) {
 }
 
 /** Makes this tab use one store's prices, like picking it on the site. Same calls as session.ts. */
-async function activateStore(page: Page, storeId: string) {
+export async function activateStore(page: Page, storeId: string) {
   return page.evaluate(async (storeId) => {
     const token = await (await fetch("/axfood/rest/csrf-token", { headers: { Accept: "application/json" } })).json();
     await fetch(`/axfood/rest/v2/store/activate?storeId=${encodeURIComponent(storeId)}&activelySelected=true`, {

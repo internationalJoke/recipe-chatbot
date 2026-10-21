@@ -17,7 +17,6 @@ import {
   Attachment,
   Conversation,
   ConversationSummary,
-  Health,
   Message,
   ShoppingList,
   StreamStatus,
@@ -31,7 +30,6 @@ import { ShoppingListCard } from './shopping-list-card';
 const LIST_TAG = '<shopping_list>';
 const STOP_RELOAD_DELAY_MS = 800;
 const SIDEBAR_KEY = 'recipe-box.sidebar-collapsed';
-const PROVIDER_NAMES: Record<string, string> = { gemini: 'Gemini', openrouter: 'OpenRouter' };
 
 function statusLabel(status: StreamStatus, query?: string) {
   if (status === 'searching') return query ? `🔍 Searching the web for “${query}”…` : '🔍 Searching the web…';
@@ -80,14 +78,12 @@ export class App implements OnInit {
   readonly thinkingStatus = signal('Thinking…');
   readonly sidebarOpen = signal(false);
   readonly error = signal('');
-  readonly health = signal<Health | null>(null);
   readonly viewedImage = signal<Attachment | null>(null);
   readonly sidebarCollapsed = signal(readCollapsed());
   prompt = '';
   private abortController: AbortController | null = null;
 
   async ngOnInit() {
-    void this.chat.health().then((health) => this.health.set(health));
     await this.refreshConversations();
     const first = this.conversations()[0];
     if (first) await this.selectConversation(first.id);
@@ -168,13 +164,6 @@ export class App implements OnInit {
   clearFiles() {
     this.selectedFiles.set([]);
     if (this.fileInput) this.fileInput.nativeElement.value = '';
-  }
-
-  modelLabel() {
-    const health = this.health();
-    if (!health) return 'Model offline';
-    if (health.llm !== 'ok') return 'Model not configured';
-    return PROVIDER_NAMES[health.provider ?? ''] ?? 'Model ready';
   }
 
   /** The message whose dish pick is turning into a shopping list. */
