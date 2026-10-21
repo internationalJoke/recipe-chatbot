@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output, signal } from '@angular/core';
 import { DishCards } from './dish-cards';
 import { Message, ShoppingList } from './models';
 import { ShoppingListCard } from './shopping-list-card';
+import { StorePicker } from './store-picker';
 
 export type FlowStep = 'recipes' | 'list' | 'prices';
 
@@ -19,7 +20,7 @@ export function currentStep(message: Pick<Message, 'shoppingList'>): FlowStep {
 // It moves to the next tab when a step is done; the user can go back by tab, arrow key, or swipe.
 @Component({
   selector: 'app-recipe-flow',
-  imports: [DishCards, ShoppingListCard],
+  imports: [DishCards, ShoppingListCard, StorePicker],
   templateUrl: './recipe-flow.html',
   styleUrl: './recipe-flow.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -28,6 +29,9 @@ export class RecipeFlow {
   readonly message = input.required<Message>();
   readonly disabled = input(false);
   readonly busy = input(false);
+  /** The local shop helper runs, so the Prices tab shows its three-shop comparison instead. */
+  readonly helperAvailable = signal(false);
+  readonly helperBestCents = signal<number | null>(null);
   readonly chosen = output<string[]>();
   readonly listChanged = output<ShoppingList>();
 
@@ -83,11 +87,11 @@ export class RecipeFlow {
   }
 
   pricesLabel() {
+    // With the shop helper, only the 3-shop comparison counts, and only once the user has run it.
     const cmp = this.message().shoppingList?.order?.comparison;
-    if (!cmp) return 'Prices';
-    const total = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: cmp.currency }).format(
-      cmp.recommendation.totalCents / 100,
-    );
+    const cents = this.helperAvailable() ? this.helperBestCents() : cmp?.recommendation.totalCents;
+    if (cents == null) return 'Prices';
+    const total = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: cmp?.currency ?? 'SEK' }).format(cents / 100);
     return `Prices · ${total}`;
   }
 }

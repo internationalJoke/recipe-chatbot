@@ -28,7 +28,13 @@
     }
     @case ('prices') {
       @if (message().shoppingList; as list) {
-        <app-shopping-list-card view="prices" [list]="list" (changed)="listChanged.emit($event)" />
+        <!-- With the shop helper running, its three-shop comparison replaces the quick two-shop estimate. -->
+        @if (!helperAvailable()) {
+          <app-shopping-list-card view="prices" [list]="list" (changed)="listChanged.emit($event)" />
+        }
+        @if (list.status === 'ACCEPTED') {
+          <app-store-picker [listId]="list.id" (available)="helperAvailable.set($event)" (bestTotal)="helperBestCents.set($event)" />
+        }
       }
     }
   }

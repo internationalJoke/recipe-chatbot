@@ -10,3 +10,5 @@ frontend/.angular/
 **/.idea/
 *.iml
 __pycache__/
+eval/data/
+*.csv

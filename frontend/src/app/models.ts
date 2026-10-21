@@ -147,3 +147,27 @@ export type SendMessageStreamEvent =
   | { type: 'chunk'; content: string }
   | ({ type: 'done' } & SendMessageResponse)
   | { type: 'error'; error: string; code?: 'text_only' };
+
+/** Shops the local shop helper can compare and fill a cart at (backend/scripts/shop-helper.ts). */
+export type ShopId = 'willys' | 'hemkop' | 'ica';
+
+export interface ShopView {
+  shop: ShopId;
+  name: string;
+  /** The store whose prices were used, e.g. "ICA Folkes Livs"; null = the site's default store. */
+  storeName: string | null;
+  distanceKm: number | null;
+  totalCents: number;
+  missing: string[];
+  lines: { item: string; product: string; size: string; costCents: number; url: string }[];
+}
+
+export interface HelperStatus {
+  phase: 'idle' | 'working' | 'waiting' | 'ready' | 'done' | 'error';
+  shoppingListId: string | null;
+  message: string;
+  /** Set while the helper waits for the user, e.g. to log in with BankID. */
+  question: string | null;
+  shops: ShopView[];
+  cart: { shop: ShopId; added: string[]; failed: { product: string; url: string }[]; skipped: boolean } | null;
+}

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { parseStoredItems } from "@/lib/shopping-list";
 import { StoreUnavailableError } from "@/lib/stores/axfood";
-import type { Location } from "@/lib/stores/branches";
+import { roughLocation, type Location } from "@/lib/stores/branches";
 import { comparePrices } from "@/lib/stores/compare";
 import { findLocalStores } from "@/lib/stores/local";
 
@@ -16,7 +16,8 @@ const withOrder = { order: true } as const;
 /**
  * Runs only after the user clicks Accept. Compares Willys and Hemköp for the ticked items and
  * saves the cheapest plan. With the user's location, prices come from the nearest stores; the
- * location itself is not saved, only which stores were used. Nothing is bought online: the user finishes at the store's site.
+ * location is saved only rounded to about a km (`comparison.near`), so `npm run shop` can use the
+ * same nearby stores. Nothing is bought online: the user finishes at the store's site.
  * Prices are fetched before the claim, so a store outage leaves the list open to try again.
  */
 export async function acceptShoppingList(listId: string, itemIds: string[], location?: Location) {
@@ -53,7 +54,7 @@ export async function acceptShoppingList(listId: string, itemIds: string[], loca
         lines: comparison.lines,
         missing: comparison.missing,
         totalCents: comparison.recommendation.totalCents,
-        comparison,
+        comparison: location ? { ...comparison, near: roughLocation(location) } : comparison,
       },
     });
     return tx.shoppingList.findUniqueOrThrow({ where: { id: listId }, include: withOrder });

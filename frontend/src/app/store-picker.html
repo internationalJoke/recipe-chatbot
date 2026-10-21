@@ -1,0 +1,118 @@
+<section class="picker" aria-label="Buy at one shop">
+  <header>
+    <span class="icon" aria-hidden="true">🧺</span>
+    <div>
+      <strong>Buy at one shop</strong>
+    </div>
+  </header>
+
+  @if (offline()) {
+    <div class="offline">
+      <p>Start the shop helper on this computer, then check again:</p>
+      <code>cd backend &amp;&amp; npm run shop:helper</code>
+      <button type="button" class="secondary" (click)="refresh()">Check again</button>
+    </div>
+  } @else {
+    @if (mine(); as s) {
+      @if (s.shops.length) {
+        <div class="shops">
+          @for (view of s.shops; track view.shop) {
+            <article class="shop" [class.best]="view.shop === cheapest()" [class.chosen]="s.cart?.shop === view.shop">
+              <header class="shop-head">
+                <span class="brand" [style.--brand]="brand(view.shop).color">
+                  @if (brand(view.shop).logoUrl; as logo) {
+                    <img [src]="logo" [alt]="view.name" />
+                  } @else {
+                    <span>{{ view.name }}</span>
+                  }
+                </span>
+                @if (view.shop === cheapest()) {
+                  <span class="badge">Cheapest</span>
+                }
+              </header>
+              <div class="total" [class.partial]="view.missing.length">
+                <strong>{{ money(view.totalCents) }}</strong>
+                <small>{{ view.missing.length ? view.lines.length + ' of ' + itemCount(view) + ' items' : 'all ' + itemCount(view) + ' items' }}</small>
+              </div>
+              <div class="branch">
+                <span aria-hidden="true">📍</span>
+                <span class="place" [title]="view.storeName ?? ''">{{ place(view) }}</span>
+                @if (km(view); as km) { <span class="km">{{ km }}</span> }
+              </div>
+              <ul>
+                @for (line of view.lines; track line.url + line.item) {
+                  <li>
+                    <a [href]="line.url" target="_blank" rel="noopener noreferrer" [title]="line.product">{{ line.item }} <span class="size">({{ size(line.size) }})</span></a>
+                    <span>{{ money(line.costCents) }}</span>
+                  </li>
+                }
+              </ul>
+              @if (view.missing.length) {
+                <p class="missing">Not at this store: {{ view.missing.join(', ') }}</p>
+              }
+              <!-- A store missing an ingredient cannot cover the dish, so it cannot be picked. -->
+              <button type="button" class="primary buy" [disabled]="running() || filledShop() || view.missing.length > 0" (click)="buy(view.shop)">
+                {{ filledShop() === view.shop ? 'In your cart ✓' : view.missing.length ? 'Missing ' + view.missing.length + (view.missing.length === 1 ? ' item' : ' items') : 'Buy at ' + view.name }}
+              </button>
+            </article>
+          }
+        </div>
+      }
+
+      @if (s.phase !== 'idle' && s.phase !== 'ready') {
+        <p class="status" [class.error]="s.phase === 'error'" [class.done]="s.phase === 'done' && !s.cart?.skipped" [class.skipped]="s.cart?.skipped" role="status">
+          @if (running()) { <span class="spinner" aria-hidden="true"></span> }
+          {{ s.message }}
+        </p>
+      }
+
+      @if (s.phase === 'waiting' && s.question) {
+        <div class="question" role="alert">
+          <p>{{ s.question }}</p>
+          <div class="row">
+            <button type="button" class="secondary" (click)="answer(true)">Skip</button>
+            <button type="button" class="primary" (click)="answer(false)">Done, continue</button>
+          </div>
+        </div>
+      }
+
+      @if (s.cart; as cart) {
+        <div class="cart" [class.empty]="cart.skipped">
+          @if (cart.added.length) {
+            <p><strong>In your cart:</strong> {{ cart.added.join(' · ') }}</p>
+          }
+          @if (cart.failed.length) {
+            <p>
+              <strong>Add these yourself:</strong>
+              @for (item of cart.failed; track item.url) {
+                <a [href]="item.url" target="_blank" rel="noopener noreferrer">{{ item.product }}</a>
+              }
+            </p>
+          }
+          @if (!cart.skipped) {
+            <p class="hint">Check the cart in the Chrome window, then pay at the store's site when you are ready.</p>
+          }
+        </div>
+      }
+    }
+
+    @if (!running()) {
+      <form class="start" (submit)="$event.preventDefault(); compare()">
+        <input
+          type="text"
+          inputmode="numeric"
+          maxlength="6"
+          placeholder="Postcode (optional)"
+          aria-label="Postcode, optional; your location is used otherwise"
+          [value]="postcode()"
+          (input)="postcode.set($any($event.target).value)"
+        />
+        <button type="submit" class="primary">{{ mine()?.shops?.length ? 'Compare again' : 'Compare 3 shops' }}</button>
+      </form>
+    }
+  }
+
+  @if (error()) {
+    <p class="status error" role="alert">{{ error() }}</p>
+  }
+</section>

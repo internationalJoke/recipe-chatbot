@@ -1,0 +1,41 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\newlength{\labelw}
+\newcommand{\entry}[2]{\item \makebox[\labelw][l]{\textbf{#1:}} #2}
+
+\begin{document}
+\settowidth{\labelw}{\textbf{Idea Brainstorming:}\quad}
+
+\noindent\textbf{Contribution statement for group 23:} Zhiping Hu
+
+\vspace{1em}
+
+\begin{enumerate}[leftmargin=2em, itemsep=0.5em]
+  \entry{Idea Brainstorming}{All}
+  \entry{Architecture}{All}
+  \entry{Ingredients Scan}{Zhiping Hu}
+  \begin{itemize}[itemsep=0.2em, topsep=0.3em]
+    \item Built the initial project framework: Angular frontend and NestJS backend.
+    \item Designed the UI and the user interaction flow of the platform.
+    \item Selected OpenRouter as the LLM provider and DeepSeek V4.1 Flash as the model, for budget reasons.
+  \end{itemize}
+  \entry{Recipe Engine}{Dan Zhang}
+  \entry{Web Order}{Helmut Brüls}
+  \entry{Testing}{All}
+  \begin{itemize}[itemsep=0.2em, topsep=0.3em]
+    \item Designed and implemented the ontology tests for receipe engine.
+  \end{itemize}
+  \entry{Report}{All}
+\end{enumerate}
+
+\vspace{1em}
+
+\noindent\textbf{Repository:} \url{https://github.com/internationalJoke/recipe-chatbot} \\
+We are using the \texttt{ontology-matching} branch.
+
+\end{document}

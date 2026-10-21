@@ -39,6 +39,12 @@ export function distanceKm(a: Location, b: Location) {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
+/** Two decimals is about a kilometre: enough to find stores, too rough to find a home. */
+export function roughLocation(location: Location): Location {
+  const round = (deg: number) => Math.round(deg * 100) / 100;
+  return { lat: round(location.lat), lon: round(location.lon) };
+}
+
 export function parseBranches(data: unknown): BranchSite[] {
   if (!Array.isArray(data)) return [];
   return data.flatMap((raw) => {

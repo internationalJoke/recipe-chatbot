@@ -43,3 +43,7 @@ next-env.d.ts
 /src/generated/prisma
 
 !.env.example
+
+# browser profile for scripts/fill-cart.ts (login cookies)
+/.cart-profile
+/.cart-debug

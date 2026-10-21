@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearBranchCache, distanceKm, nearestBranches, parseBranches } from "@/lib/stores/branches";
+import { clearBranchCache, distanceKm, nearestBranches, parseBranches, roughLocation } from "@/lib/stores/branches";
 import { clearSessionCache, mergeCookies, storeSessionCookie } from "@/lib/stores/session";
 
 const site = (storeId: string, name: string, latitude: number, longitude: number, onlineStore = true) => ({
@@ -20,6 +20,10 @@ afterEach(() => {
 describe("branches", () => {
   it("measures distance on the earth", () => {
     expect(distanceKm({ lat: 59.3293, lon: 18.0686 }, UPPSALA)).toBeCloseTo(64, 0);
+  });
+
+  it("rounds a location to about a kilometre before it is saved", () => {
+    expect(roughLocation({ lat: 59.332612, lon: 18.064911 })).toEqual({ lat: 59.33, lon: 18.06 });
   });
 
   it("skips stores without coordinates", () => {
