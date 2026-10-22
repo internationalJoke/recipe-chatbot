@@ -79,7 +79,7 @@ def request(method, url, body=None, headers=None, timeout=300):
 
 
 def ask(api, photo):
-    """Send one photo in a new conversation. Returns (conversation id, final event, seconds)."""
+    """Send one photo in a new conversation. Returns (conversation id, final event, seconds, dish tool)."""
     conv = json.loads(request("POST", f"{api}/conversations", b"{}", {"Content-Type": "application/json"}))
     boundary = uuid.uuid4().hex
     body = (
@@ -92,7 +92,15 @@ def ask(api, photo):
                   {"Content-Type": f"multipart/form-data; boundary={boundary}"})
     events = [json.loads(l) for l in raw.decode().splitlines() if l.strip()]
     final = next((e for e in reversed(events) if e.get("type") in ("done", "error")), {"type": "error", "error": "no reply"})
-    return conv["id"], final, time.time() - start
+    return conv["id"], final, time.time() - start, dish_tool(events)
+
+
+def dish_tool(events):
+    """Who called suggestDishes: "model", "forced" (the backend's safety net), or "none"."""
+    calls = [e for e in events if e.get("type") == "status" and e.get("status") == "dishes"]
+    if any(not e.get("forced") for e in calls):
+        return "model"
+    return "forced" if calls else "none"
 
 
 def found_ingredients(final, vocab):
@@ -143,18 +151,18 @@ def main():
     results = []
     for r in rows:
         truth = {singular(t) for t in r["ingredients"].split(";")}
-        conv_id, final, secs = ask(args.api, args.photos / r["file"])
+        conv_id, final, secs, tool = ask(args.api, args.photos / r["file"])
         predicted, source = found_ingredients(final, vocab)
         hits, recall, precision = score(truth, predicted, vocab)
         results.append({
-            "file": r["file"], "labels": ";".join(sorted(truth)), "predicted": ";".join(predicted), "source": source,
+            "file": r["file"], "labels": ";".join(sorted(truth)), "predicted": ";".join(predicted), "source": source, "dish_tool": tool,
             "found": ";".join(sorted(hits)), "missed": ";".join(sorted(truth - hits)),
             "recall": round(recall, 3), "precision": "" if precision is None else round(precision, 3),
             "recipes": len((final.get("assistantMessage") or {}).get("dishes") or []),
             "seconds": round(secs, 1), "error": final.get("error", ""),
         })
         print(f"{r['file']}: recall {recall:.2f}  found {sorted(hits)}  missed {sorted(truth - hits)}  "
-              f"predicted {predicted}  {secs:.0f}s {final.get('error', '')}")
+              f"predicted {predicted}  tool {tool}  {secs:.0f}s {final.get('error', '')}")
         if not args.keep:
             request("DELETE", f"{args.api}/conversations/{conv_id}")
 
@@ -169,6 +177,8 @@ def main():
     print(f"Mean precision: {sum(precisions) / len(precisions):.3f}" if precisions else "Mean precision: n/a")
     print(f"No ingredients: {sum(not r['predicted'] for r in results)}")
     print(f"No recipe found: {sum(r['recipes'] == 0 for r in results)}")
+    for who in ("model", "forced", "none"):
+        print(f"suggestDishes {who}: {sum(r['dish_tool'] == who for r in results)}")
     print(f"Mean latency:   {sum(r['seconds'] for r in results) / len(results):.1f}s")
     print(f"Saved {args.out / 'photo_results.csv'}")
 

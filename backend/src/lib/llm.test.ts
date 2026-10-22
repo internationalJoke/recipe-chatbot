@@ -18,7 +18,7 @@ vi.mock("@/lib/files", () => ({
   readUpload: async (path: string) => Buffer.from(path.endsWith(".txt") ? "2 eggs, flour" : "PIXELS"),
 }));
 
-const { buildModelMessages, friendlyError, listIsRelevant, looksLikeRecipe, streamChat, TextOnlyModelError } = await import("@/lib/llm");
+const { asksForDishes, buildModelMessages, friendlyError, listIsRelevant, looksLikeRecipe, streamChat, TextOnlyModelError } = await import("@/lib/llm");
 
 type Row = Message & { attachments: Attachment[] };
 let seq = 0;
@@ -328,6 +328,72 @@ describe("streamChat", () => {
     expect(statuses).toContain("suggestDishes");
   });
 
+  it("forces suggestDishes when the user asked what to cook and the model skipped it", async () => {
+    const model = streamingModel("You could make a nice tortilla with eggs and potatoes.");
+    const choices: unknown[] = [];
+    model.doGenerate = async (options) => {
+      choices.push(options.toolChoice);
+      expect(options.tools?.map((t) => t.name)).toEqual(["suggestDishes"]);
+      return {
+        content: [{ type: "tool-call", toolCallId: "f1", toolName: "suggestDishes", input: JSON.stringify({ ingredients: ["egg", "potato"] }) }],
+        finishReason: { unified: "tool-calls", raw: "tool_calls" },
+        usage,
+        warnings: [],
+      } as never;
+    };
+    mockModel.current = model;
+    const statuses: string[] = [];
+    const reply = await streamChat([row("USER", "What can I cook with eggs and potatoes?")], () => {}, undefined, (name) => statuses.push(name));
+    expect(choices).toEqual([{ type: "required" }]);
+    expect(reply.dishes).toEqual([expect.objectContaining({ name: "Tortilla", recipeId: 7 })]);
+    expect(reply.shoppingItems).toEqual([]);
+    expect(statuses).toEqual(["suggestDishes"]);
+  });
+
+  it("forces suggestDishes for a photo sent without text", async () => {
+    const model = streamingModel("I can see eggs and potatoes.");
+    let generated = 0;
+    model.doGenerate = async () => {
+      generated += 1;
+      return {
+        content: [{ type: "tool-call", toolCallId: "f1", toolName: "suggestDishes", input: JSON.stringify({ ingredients: ["egg", "potato"] }) }],
+        finishReason: { unified: "tool-calls", raw: "tool_calls" },
+        usage,
+        warnings: [],
+      } as never;
+    };
+    mockModel.current = model;
+    const reply = await streamChat([row("USER", "", [attachment("fridge.jpg", "image/jpeg")])], () => {});
+    expect(generated).toBe(1);
+    expect(reply.dishes).toHaveLength(1);
+  });
+
+  it("does not force suggestDishes for a named dish or small talk", async () => {
+    for (const text of ["Give me a recipe for lasagna", "who are you"]) {
+      const model = streamingModel("Sure, here is my answer.");
+      let generated = 0;
+      model.doGenerate = async () => {
+        generated += 1;
+        throw new Error("should not be called");
+      };
+      mockModel.current = model;
+      const reply = await streamChat([row("USER", text)], () => {});
+      expect(generated).toBe(0);
+      expect(reply.dishes).toEqual([]);
+    }
+  });
+
+  it("keeps the answer when the forced suggestDishes call fails", async () => {
+    const model = streamingModel("Try a tortilla.");
+    model.doGenerate = async () => {
+      throw new APICallError({ message: "down", url: "u", requestBodyValues: {}, statusCode: 502 });
+    };
+    mockModel.current = model;
+    const reply = await streamChat([row("USER", "what should I make for dinner?")], () => {});
+    expect(reply.content).toBe("Try a tortilla.");
+    expect(reply.dishes).toEqual([]);
+  });
+
   it("rejects an empty answer", async () => {
     mockModel.current = streamingModel();
     await expect(streamChat([row("USER", "hi")], () => {})).rejects.toThrow(/empty answer/);
@@ -391,6 +457,25 @@ describe("looksLikeRecipe", () => {
     expect(looksLikeRecipe("Chop the onions, then roast them for 30 minutes. ".repeat(5))).toBe(true);
     expect(looksLikeRecipe("The president serves a four-year term and will serve until 2029. ".repeat(5))).toBe(false);
     expect(looksLikeRecipe("Roast. Chop.")).toBe(false);
+  });
+});
+
+describe("asksForDishes", () => {
+  it("is true for a photo without text or a what-to-cook question", () => {
+    expect(asksForDishes("", true)).toBe(true);
+    expect(asksForDishes("What can I cook tonight?", false)).toBe(true);
+    expect(asksForDishes("what should we make with these?", true)).toBe(true);
+    expect(asksForDishes("any dinner ideas?", false)).toBe(true);
+    expect(asksForDishes("I have chicken, rice and leeks. Suggest something", false)).toBe(true);
+    expect(asksForDishes("Here is what's in my fridge", true)).toBe(true);
+  });
+
+  it("is false for named dishes, questions and small talk", () => {
+    expect(asksForDishes("Give me a recipe for lasagna", false)).toBe(false);
+    expect(asksForDishes("How do I make this?", true)).toBe(false);
+    expect(asksForDishes("dinner?", false)).toBe(false);
+    expect(asksForDishes("who are you", false)).toBe(false);
+    expect(asksForDishes("how long do I boil an egg?", false)).toBe(false);
   });
 });
 

@@ -159,6 +159,8 @@ function replyStream(
                 type: "status",
                 status: STATUS_BY_TOOL[toolName] ?? "using_tool",
                 ...(queryOf(input) ? { query: queryOf(input) } : {}),
+                // No input: the backend's safety net called the tool, not the model.
+                ...(input === undefined ? { forced: true } : {}),
               });
             },
           );

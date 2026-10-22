@@ -1,6 +1,6 @@
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { APICallError, generateText, isStepCount, streamText, type LanguageModel, type ModelMessage } from "ai";
+import { APICallError, generateText, isStepCount, streamText, type LanguageModel, type ModelMessage, type ToolSet } from "ai";
 import type { Attachment, Message } from "@/generated/prisma/client";
 import { isImageMimeType, isTextMimeType, readUpload } from "@/lib/files";
 import { resolveLlmConfig, type LlmConfig } from "@/lib/llm-config";
@@ -103,6 +103,8 @@ type StreamRun = {
   listToolCalled: boolean;
   /** Dish cards from suggestDishes, with photos. */
   dishes: Dish[];
+  /** The model called suggestDishes itself (maybe with no match), so don't force it. */
+  dishToolCalled: boolean;
 };
 
 async function pipeStream(
@@ -122,6 +124,7 @@ async function pipeStream(
         const items = (part.input as { items?: unknown } | undefined)?.items;
         if (Array.isArray(items)) run.shoppingItems.push(...items);
       }
+      if (part.toolName === SUGGEST_DISHES) run.dishToolCalled = true;
       onToolCall?.(part.toolName as string, part.input);
     } else if (part.type === "tool-result") {
       run.toolOutputs.push({ toolName: part.toolName as string, input: part.input, output: part.output });
@@ -193,6 +196,44 @@ export function looksLikeRecipe(answer: string) {
   return hints.size >= 2;
 }
 
+// The user wants ideas from what they have, e.g. "what can I cook?", "dinner ideas", "in my fridge".
+// A named dish ("recipe for lasagna") or a cooking question does not count.
+const DISH_REQUEST =
+  /\bwhat\s+(?:can|could|should|shall|do|would)\s+(?:i|we)\s+(?:cook|make|eat|prepare|bake)\b|\bwhat\s+to\s+(?:cook|make|eat)\b|\b(?:recipe|dish|meal|dinner|lunch|breakfast|supper)\s+(?:ideas?|suggestions?|inspiration)\b|\bsuggest\s+(?:something|anything|some|a|any|dish(?:es)?|recipes?|meals?)\b|\b(?:in|from)\s+my\s+(?:fridge|pantry|kitchen)\b|\bcook\s+with\b/i;
+
+/** The user sent a photo with no text, or asked what to cook: then the dish cards must appear. */
+export function asksForDishes(userText: string, hasImage: boolean) {
+  return (hasImage && !userText.trim()) || DISH_REQUEST.test(userText);
+}
+
+const DISH_TOOL_REQUEST =
+  "Call suggestDishes now with the ingredients I have, from my messages and photos, " +
+  "as short singular English names.";
+
+/**
+ * Small models sometimes answer "what can I cook?" from memory instead of the recipe database.
+ * Ask once more with only suggestDishes offered and required, so the cards come from the database.
+ */
+async function forceDishes(
+  base: { model: LanguageModel; instructions: string; temperature: number; abortSignal: AbortSignal },
+  messages: ModelMessage[],
+  answer: string,
+  dishTool: ToolSet[string],
+): Promise<Dish[]> {
+  const result = await generateText({
+    ...base,
+    temperature: LIST_TEMPERATURE,
+    maxRetries: 1,
+    messages: [...messages, { role: "assistant", content: answer || "…" }, { role: "user", content: DISH_TOOL_REQUEST }],
+    tools: { [SUGGEST_DISHES]: dishTool },
+    toolChoice: "required",
+    stopWhen: isStepCount(1),
+  });
+  return result.toolResults
+    .filter((r) => r.toolName === SUGGEST_DISHES)
+    .flatMap((r) => dishesFromToolOutput(r.output));
+}
+
 const LIST_REQUEST =
   "Call proposeShoppingList now with every ingredient from your answer that I did not say I already have, " +
   "including staples like oil, salt, spices, and stock. I will untick what I already have, so include anything " +
@@ -240,7 +281,7 @@ export async function streamChat(
   const hasTools = Object.keys(tools).length > 0;
   const model = createModel(config);
   const base = { model, instructions: buildSystemPrompt(), temperature: config.temperature, maxRetries: 1, abortSignal };
-  const run: StreamRun = { content: "", toolOutputs: [], shoppingItems: [], toolsUnsupported: false, listToolCalled: false, dishes: [] };
+  const run: StreamRun = { content: "", toolOutputs: [], shoppingItems: [], toolsUnsupported: false, listToolCalled: false, dishes: [], dishToolCalled: false };
 
   try {
     const messages = await buildModelMessages(history);
@@ -265,7 +306,20 @@ export async function streamChat(
       throw new Error("The model returned an empty answer.");
     }
 
-    const lastUserText = [...history].reverse().find((m) => m.role === "USER")?.content ?? "";
+    const lastUser = [...history].reverse().find((m) => m.role === "USER");
+    const lastUserText = lastUser?.content ?? "";
+    const sentImage = lastUser?.attachments.some((a) => isImageMimeType(a.mimeType)) ?? false;
+    if (hasTools && !run.toolsUnsupported && !run.dishToolCalled && asksForDishes(lastUserText, sentImage)) {
+      onToolCall?.(SUGGEST_DISHES, undefined);
+      try {
+        run.dishes.push(...(await forceDishes(base, messages, run.content, tools[SUGGEST_DISHES])));
+      } catch (error) {
+        // The answer is already complete; missing cards must not fail the reply.
+        if (abortSignal.aborted) throw error;
+        console.warn("Could not get dish suggestions for the answer:", friendlyError(error));
+      }
+    }
+
     if (run.shoppingItems.length > 0 && (run.dishes.length > 0 || !listIsRelevant(lastUserText, run.content))) {
       // With dish cards, the list waits until the user picks a dish.
       console.info("Dropping a shopping list: no food suggested, or dishes still to choose from.");
